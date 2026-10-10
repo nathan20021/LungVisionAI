@@ -31,8 +31,8 @@ function SettingsPage() {
       <div className="p-8">
         <div className="bg-white rounded-lg p-6 h-[85vh] flex flex-col">
           <div className="w-full h-[70%] flex flex-col gap-12">
-            <div className="flex items-center gap-10 border-b-[1px] pb-5">
-              <div className="h-[5rem] w-[5rem] rounded-full flex justify-center items-center relative group cursor-pointer">
+            <div className="flex items-center gap-10 border-b pb-5">
+              <div className="h-20 w-20 rounded-full flex justify-center items-center relative group cursor-pointer">
                 {user?.avatar ? (
                   <img
                     src={user.avatar}

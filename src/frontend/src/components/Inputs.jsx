@@ -12,7 +12,7 @@ export const PrimaryTextInput = ({
       placeholder={placeholder}
       value={value}
       onChange={onChange}
-      className="h-14 rounded p-2 w-full bg-[#F2F2F2] indent-5 placeholder-[#BFBFBF]"
+      className="h-14 rounded-sm p-2 w-full bg-[#F2F2F2] indent-5 placeholder-[#BFBFBF]"
     />
   );
 };

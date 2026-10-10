@@ -7,7 +7,7 @@ from .detr import Detr
 from collections import defaultdict
 
 # Constants
-MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "detr.ckpt")
+MODEL_PATH = os.environ.get("MODEL_PATH", "/models/detr.ckpt")
 
 anatomical_regions = [
     'right upper lung zone',
@@ -44,7 +44,6 @@ print(f"Using device: {device}")
 model = Detr.load_from_checkpoint(MODEL_PATH, map_location=device)
 model.to(device)
 model.eval()
-model = torch.compile(model)
 print("DETR Model loaded...")
 
 def get_boxes(binary_data):

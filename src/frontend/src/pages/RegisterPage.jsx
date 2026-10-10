@@ -26,10 +26,12 @@ function RegisterPage() {
     password: "",
     confirmPassword: "",
   });
-  const { register } = useAuth();
+  const [error, setError] = useState("");
+  const { register, login } = useAuth();
 
   const onSubmit = useCallback(async () => {
     try {
+      setError("");
       if (registerFormValue.password !== registerFormValue.confirmPassword) {
         throw new Error("Passwords do not match");
       }
@@ -53,7 +55,7 @@ function RegisterPage() {
       setRegisterSuccess(true);
     } catch (error) {
       console.error("Registration failed:", error);
-      // Add error handling UI here
+      setError(error.message);
     }
   }, [register, registerFormValue]);
 
@@ -61,14 +63,14 @@ function RegisterPage() {
     <div className="w-full h-full flex justify-center items-center">
       {!registerSuccess ? (
         <div className="w-[70%] h-[60%] max-w-[1100px] bg-white flex">
-          <div className="h-full w-1/2 bg-gradient-to-tl from-primary to-[#00B6AD] flex flex-col items-center justify-center gap-4">
+          <div className="h-full w-1/2 bg-linear-to-tl from-primary to-[#00B6AD] flex flex-col items-center justify-center gap-4">
             <h1 className="text-white text-4xl font-medium">LungVision AI</h1>
             <h4 className="text-white">Already has an account?</h4>
             <Link to="/login">
               <SecondaryButton text="Sign In" onClick={void 0} />
             </Link>
           </div>
-          <div className="h-full w-1/2 flex justify-center items-center">
+          <div className="h-full w-1/2 flex flex-col justify-center items-center">
             <CurrentFlowView
               registerFormValue={registerFormValue}
               setRegisterFormValue={setRegisterFormValue}
@@ -77,6 +79,7 @@ function RegisterPage() {
               totalSteps={RegisterFlow.length}
               onSubmit={onSubmit}
             />
+            {error && <div className="text-error text-sm w-4/5">{error}</div>}
           </div>
         </div>
       ) : (
@@ -90,9 +93,10 @@ function RegisterPage() {
               <h3 className="text-gray-600">to LungVision AI🫀</h3>
             </div>
 
-            <Link to="/dashboard">
-              <PrimaryButton text="Go to Dashboard" onClick={void 0} />
-            </Link>
+            <PrimaryButton
+              text="Sign In"
+              onClick={() => login(registerFormValue.email)}
+            />
           </div>
         </div>
       )}

@@ -1,0 +1,59 @@
+flowchart LR
+  subgraph BROWSER["Browser - clinician device"]
+    U["Clinician"]
+    FE["React SPA - Vite, oidc-client-ts"]
+  end
+
+  subgraph IDP["Identity - Zitadel stack, docker compose only"]
+    ZPX["Traefik proxy :8080"]
+    ZL["Zitadel Login V2 UI"]
+    ZA["Zitadel API and OIDC v4.19.4"]
+    ZDB[("Zitadel Postgres")]
+    ZB["zitadel-bootstrap job"]
+    SSO["Hospital SSO mock - dev only"]
+  end
+
+  subgraph APP["App tier - compose; ECS configured-only"]
+    BE["Flask backend :5000"]
+  end
+
+  subgraph INFER["Inference tier"]
+    NA["NeuralAnalyzer Flask :9999 - DETR + classifier"]
+    TXV["TorchXRayVision - source removed"]
+  end
+
+  subgraph AWS["AWS stores - referenced in code, not in IaC"]
+    S3[("S3 neuralanalyzer-xrays")]
+    DDB[("DynamoDB record and prescription tables")]
+  end
+
+  subgraph EXT["External SaaS"]
+    OAI["OpenAI Chat Completions"]
+    HF["Hugging Face Hub"]
+  end
+
+  subgraph TRAIN["Training - offline on Kaggle"]
+    NB["cyc2cyc-50 notebook - CycleGAN"]
+  end
+
+  U --> FE
+  FE -->|"I-001 to I-022 HTTPS REST, Bearer JWT"| BE
+  FE -->|"I-030 to I-035 OIDC code + PKCE, SDK-derived"| ZPX
+  ZPX -->|"I-032 login UI routes"| ZL
+  ZPX -->|"I-032 API and OIDC routes, h2c"| ZA
+  ZL -->|"I-044 Zitadel API, login-client PAT"| ZA
+  ZA -->|"I-045 SQL"| ZDB
+  ZA -.->|"I-036 I-037 OIDC federation, configured dev-only"| SSO
+  ZB -->|"I-043 admin and management API, admin PAT"| ZA
+  BE -->|"I-040 JWKS GET"| ZA
+  BE -->|"I-041 I-042 user and authorization API, service PAT"| ZA
+  FE -->|"I-025 presigned PUT, I-026 img GET bare URL"| S3
+  BE -->|"I-051 GET xRayUrl, I-052 PutObject"| S3
+  BE -->|"I-053 Query, PutItem, UpdateItem"| DDB
+  BE -->|"I-060 to I-062 HTTP multipart, no timeout"| NA
+  BE -->|"I-070 HTTPS chat completion"| OAI
+  NA -->|"I-071 from_pretrained at startup, SDK-derived"| HF
+  BE -.->|"I-064 config only, no caller, no failover"| TXV
+
+  classDef gap stroke-dasharray:5 5
+  class TXV,SSO gap

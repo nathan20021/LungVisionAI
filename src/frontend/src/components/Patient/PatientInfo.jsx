@@ -7,7 +7,7 @@ function PatientInfo({ patient, activeTab, setActiveTab }) {
   const tabs = ["Overview", "Medical Record"];
 
   return (
-    <div className="bg-white rounded-lg shadow-sm">
+    <div className="bg-white rounded-lg shadow-xs">
       {/* Patient Info Section */}
       <div className="p-6">
         <div className="flex items-center gap-4">
@@ -35,11 +35,11 @@ function PatientInfo({ patient, activeTab, setActiveTab }) {
               <br />
             </div>
           </div>
-          <div className="pl-5 ml-5 bl-2 border-gray-200 border-l-[1px] text-right text-sm text-gray-600">
+          <div className="pl-5 ml-5 bl-2 border-gray-200 border-l text-right text-sm text-gray-600">
             <div className="flex gap-2 items-center">
               <FiMail />
               <Link to={`mailto:${patient.email}`}>
-                <p className=" cursor-pointer text-[#3C7187] hover:text-[#53859b] transition-colors duration-200 ease-in-out underline">
+                <p className=" cursor-pointer text-primary hover:text-[#53859b] transition-colors duration-200 ease-in-out underline">
                   {patient.email}
                 </p>
               </Link>
@@ -61,10 +61,10 @@ function PatientInfo({ patient, activeTab, setActiveTab }) {
               py-4 px-2 relative transition-colors duration-200 ease-in-out
               ${
                 activeTab === tab
-                  ? "text-[#3C7187] font-medium"
-                  : "text-gray-600 hover:text-[#3C7187]"
+                  ? "text-primary font-medium"
+                  : "text-gray-600 hover:text-primary"
               }
-              outline-none focus:outline-none active:outline-none select-none
+              outline-hidden focus:outline-hidden active:outline-hidden select-none
               -webkit-tap-highlight-color-transparent
             `}
             onClick={() => setActiveTab(tab)}
@@ -76,8 +76,8 @@ function PatientInfo({ patient, activeTab, setActiveTab }) {
                 transition-all duration-200 ease-in-out
                 ${
                   activeTab === tab
-                    ? "bg-[#3C7187] opacity-100"
-                    : "bg-[#3C7187] opacity-0"
+                    ? "bg-primary opacity-100"
+                    : "bg-primary opacity-0"
                 }
               `}
             />

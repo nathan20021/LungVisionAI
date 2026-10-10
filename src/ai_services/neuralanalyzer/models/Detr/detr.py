@@ -1,3 +1,4 @@
+import re
 import torch
 import numpy as np
 import pytorch_lightning as pl
@@ -5,12 +6,18 @@ import pytorch_lightning as pl
 from torch import nn
 from transformers import DetrImageProcessor, DetrForObjectDetection
 
-# Backend - Please ignore warning message
-torch._dynamo.config.suppress_errors = True
-
 # Constants
 MODEL_CHECKPOINT = 'facebook/detr-resnet-50'
 image_processor = DetrImageProcessor.from_pretrained(MODEL_CHECKPOINT)
+
+# transformers 5 renamed DETR's submodules. Checkpoints trained with transformers 4
+# use the old names; these are the renames from transformers' own conversion
+# mapping for DetrModel (transformers/conversion_mapping.py).
+TRANSFORMERS_V4_RENAMES = [
+    (re.compile(r"backbone\.conv_encoder\."), "backbone."),
+    (re.compile(r"\.out_proj\."), ".o_proj."),
+    (re.compile(r"layers\.(\d+)\.fc([12])\."), r"layers.\1.mlp.fc\2."),
+]
 
 # Model
 class Detr(pl.LightningModule):
@@ -29,6 +36,18 @@ class Detr(pl.LightningModule):
 
     def forward(self, pixel_values, pixel_mask):
         return self.model(pixel_values=pixel_values, pixel_mask=pixel_mask)
+
+    def on_load_checkpoint(self, checkpoint):
+        expected_keys = set(self.state_dict())
+        state_dict = checkpoint["state_dict"]
+        for key in list(state_dict):
+            if key in expected_keys:
+                continue
+            new_key = key
+            for pattern, replacement in TRANSFORMERS_V4_RENAMES:
+                new_key = pattern.sub(replacement, new_key)
+            if new_key in expected_keys:
+                state_dict[new_key] = state_dict.pop(key)
 
     def common_step(self, batch):
         pixel_values = batch["pixel_values"]

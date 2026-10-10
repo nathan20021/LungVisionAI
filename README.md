@@ -22,7 +22,7 @@ CXR-Capstone/
 │   │   │   ├── logger.py         # Logging configuration
 │   │   │   └── data/
 │   │   │       ├── __init__.py
-│   │   │       ├── aws_cognito.py     # AWS Cognito provider
+│   │   │       ├── zitadel.py         # Zitadel identity provider
 │   │   │       └── prediction_services.py  # AI prediction service
 │   │   ├── decorators/
 │   │   │   └── login_required.py  # Authentication decorator
@@ -84,6 +84,7 @@ docker-compose up
 
 # 3. Access the Application:
 # - Frontend: Open your browser and go to http://localhost:3000 to access the web interface.
+# - Sign-in (Zitadel): http://localhost:8080. See src/zitadel/README.md for test accounts and SSO setup.
 # - Backend (API): The Flask API will be available at http://localhost:8888.
 
 # 4. Stopping the Containers

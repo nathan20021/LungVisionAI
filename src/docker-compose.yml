@@ -24,16 +24,24 @@ services:
     environment:
       - FRONTEND_URL=${PROTOCOL}://${HOST}:${FRONTEND_HOST_PORT}
       - NEURALANALYZER_MODEL_URL=${PROTOCOL}://neuralanalyzer_model:${NEURALANALYZER_MODEL_HOST_PORT}
+      - ZITADEL_ISSUER=http://${HOST}:${ZITADEL_HOST_PORT:-8080}
+      - ZITADEL_API_URL=http://zitadel:8080
+      - ZITADEL_CONFIG_FILE=/lungvision-auth/zitadel.json
     command: python app.py
     image: neuralanalyzer/backend:latest
     depends_on:
-      - neuralanalyzer_model
+      neuralanalyzer_model:
+        condition: service_started
+      zitadel-bootstrap:
+        condition: service_completed_successfully
     volumes:
       - ./backend:/app
+      - lungvision-auth:/lungvision-auth:ro
     env_file:
       - ./backend/.env
     networks:
       - backend_private_network
+      - zitadel_network
 
   neuralanalyzer_model:
     build: ./ai_services/neuralanalyzer
@@ -41,8 +49,11 @@ services:
       - 9999:9999
     command: python neural_app.py
     image: neuralanalyzer:latest
+    environment:
+      - MODEL_PATH=${MODEL_PATH:-/models/detr.ckpt}
     volumes:
       - ./ai_services/neuralanalyzer:/app
+      - /models:/models:ro
     networks:
       - backend_private_network
 
@@ -52,6 +63,168 @@ services:
     #   - NVIDIA_VISIBLE_DEVICES=all
     #   - NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
+  # --- Zitadel (identity provider) -------------------------------------------
+  # Dev-only setup based on Zitadel's official compose deployment. Everything is
+  # served to the browser from one origin: http://localhost:${ZITADEL_HOST_PORT:-8080}
+  zitadel-db:
+    image: postgres:17.10-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${ZITADEL_DB_PASSWORD:-postgres}
+      POSTGRES_DB: zitadel
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d zitadel -U postgres"]
+      interval: 5s
+      timeout: 30s
+      retries: 20
+    volumes:
+      - zitadel-db-data:/var/lib/postgresql/data
+    networks:
+      - zitadel_network
+
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:v4.19.4
+    user: "0"
+    command: start-from-init --masterkey "${ZITADEL_MASTERKEY:-MasterkeyNeedsToHave32Characters}"
+    environment:
+      ZITADEL_PORT: 8080
+      ZITADEL_EXTERNALDOMAIN: ${HOST}
+      ZITADEL_EXTERNALPORT: ${ZITADEL_HOST_PORT:-8080}
+      ZITADEL_EXTERNALSECURE: "false"
+      ZITADEL_TLS_ENABLED: "false"
+      ZITADEL_DATABASE_POSTGRES_DSN: postgresql://postgres:${ZITADEL_DB_PASSWORD:-postgres}@zitadel-db:5432/zitadel?sslmode=disable
+      # First-instance settings only apply when the database is initialised.
+      # To change them later: docker compose down -v (wipes Zitadel data).
+      ZITADEL_FIRSTINSTANCE_ORG_NAME: LungVisionAI
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: admin
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${ZITADEL_ADMIN_PASSWORD:-LungVision-Admin1!}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
+      # IAM owner machine user; only the zitadel-bootstrap service reads this token
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: lungvision-bootstrap
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: LungVisionAI bootstrap
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE: "2099-01-01T00:00:00Z"
+      ZITADEL_FIRSTINSTANCE_PATPATH: /zitadel/admin/admin.pat
+      ZITADEL_FIRSTINSTANCE_LOGINCLIENTPATPATH: /zitadel/bootstrap/login-client.pat
+      ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_USERNAME: login-client
+      ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_NAME: Automatically Initialized IAM_LOGIN_CLIENT
+      ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_PAT_EXPIRATIONDATE: "2099-01-01T00:00:00Z"
+      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED: "true"
+      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_BASEURI: http://${HOST}:${ZITADEL_HOST_PORT:-8080}/ui/v2/login/
+      ZITADEL_OIDC_DEFAULTLOGINURLV2: http://${HOST}:${ZITADEL_HOST_PORT:-8080}/ui/v2/login/login?authRequest=
+      ZITADEL_OIDC_DEFAULTLOGOUTURLV2: http://${HOST}:${ZITADEL_HOST_PORT:-8080}/ui/v2/login/logout?post_logout_redirect=
+      ZITADEL_SAML_DEFAULTLOGINURLV2: http://${HOST}:${ZITADEL_HOST_PORT:-8080}/ui/v2/login/login?samlRequest=
+      # Zitadel's default outbound denylist minus loopback, so it can reach the
+      # dev SSO mock on localhost:5556. Keep the default list in production.
+      ZITADEL_HTTPCLIENT_DENYLIST: 0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,169.254.0.0/16,172.16.0.0/12,192.168.0.0/16,198.18.0.0/15,::/128,fc00::/7,fe80::/10
+    healthcheck:
+      test: ["CMD", "/app/zitadel", "ready"]
+      interval: 5s
+      timeout: 30s
+      retries: 30
+      start_period: 20s
+    ports:
+      # served by zitadel-sso-mock, which shares this container's network
+      - 5556:5556
+    volumes:
+      - zitadel-bootstrap:/zitadel/bootstrap:rw
+      - zitadel-admin:/zitadel/admin:rw
+    depends_on:
+      zitadel-db:
+        condition: service_healthy
+    networks:
+      - zitadel_network
+
+  zitadel-login:
+    image: ghcr.io/zitadel/zitadel-login:v4.19.4
+    user: "0"
+    environment:
+      ZITADEL_API_URL: http://zitadel:8080
+      NEXT_PUBLIC_BASE_PATH: /ui/v2/login
+      ZITADEL_SERVICE_USER_TOKEN_FILE: /zitadel/bootstrap/login-client.pat
+      ZITADEL_SESSION_COOKIE_SECRET: ${ZITADEL_LOGIN_COOKIE_SECRET:-SessionCookieSecretNeedsAtLeast32Chars}
+      CUSTOM_REQUEST_HEADERS: Host:${HOST},X-Forwarded-Proto:http
+    healthcheck:
+      test: ["CMD", "/bin/sh", "-c", "node /app/healthcheck.mjs http://localhost:3000/ui/v2/login/healthy"]
+      interval: 5s
+      timeout: 30s
+      retries: 30
+      start_period: 20s
+    volumes:
+      - zitadel-bootstrap:/zitadel/bootstrap:ro
+    depends_on:
+      zitadel:
+        condition: service_healthy
+    networks:
+      - zitadel_network
+
+  zitadel-proxy:
+    image: traefik:v3.7.7
+    command:
+      - --entrypoints.web.address=:8080
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --log.level=WARN
+    ports:
+      - ${ZITADEL_HOST_PORT:-8080}:8080
+    volumes:
+      - ./zitadel/traefik.yml:/etc/traefik/dynamic.yml:ro
+    depends_on:
+      zitadel:
+        condition: service_healthy
+      zitadel-login:
+        condition: service_healthy
+    networks:
+      - zitadel_network
+
+  # Creates the LungVisionAI project, doctor:*/patient:* roles, frontend app,
+  # backend service user and SSO provider, then exits. Safe to re-run.
+  zitadel-bootstrap:
+    build: ./backend
+    command: python scripts/zitadel_bootstrap.py
+    environment:
+      ZITADEL_ISSUER: http://${HOST}:${ZITADEL_HOST_PORT:-8080}
+      ZITADEL_API_URL: http://zitadel:8080
+      ZITADEL_ADMIN_PAT_FILE: /zitadel/admin/admin.pat
+      ZITADEL_CONFIG_FILE: /lungvision-auth/zitadel.json
+      FRONTEND_URLS: ${PROTOCOL}://${HOST}:${FRONTEND_HOST_PORT}
+      # SSO provider shown on the login page; defaults to the dev mock below.
+      # Set SSO_OIDC_ISSUER= (empty) to skip SSO.
+      SSO_OIDC_NAME: ${SSO_OIDC_NAME:-Hospital SSO (dev)}
+      SSO_OIDC_ISSUER: ${SSO_OIDC_ISSUER-http://localhost:5556/hospital}
+      SSO_OIDC_CLIENT_ID: ${SSO_OIDC_CLIENT_ID:-zitadel}
+      SSO_OIDC_CLIENT_SECRET: ${SSO_OIDC_CLIENT_SECRET:-dev-sso-client-secret}
+    volumes:
+      - ./backend:/app:ro
+      - zitadel-admin:/zitadel/admin:ro
+      - lungvision-auth:/lungvision-auth
+    depends_on:
+      zitadel:
+        condition: service_healthy
+    networks:
+      - zitadel_network
+
+  # Dev-only mock SSO provider standing in for a hospital IdP (Entra ID, Okta, ...).
+  # Its login page accepts any username, e.g. "dr.sso" signs in as dr.sso@hospital.example.
+  # It shares the zitadel container's network, so the browser and Zitadel both reach it at localhost:5556.
+  zitadel-sso-mock:
+    image: ghcr.io/navikt/mock-oauth2-server:6.0.2
+    network_mode: service:zitadel
+    environment:
+      SERVER_PORT: 5556
+      JSON_CONFIG_PATH: /config/sso-mock.json
+    volumes:
+      - ./zitadel/sso-mock.json:/config/sso-mock.json:ro
+    depends_on:
+      zitadel:
+        condition: service_started
+
 networks:
   backend_private_network:
     driver: bridge
+  zitadel_network:
+    driver: bridge
+
+volumes:
+  zitadel-db-data:
+  zitadel-bootstrap:
+  zitadel-admin:
+  lungvision-auth:

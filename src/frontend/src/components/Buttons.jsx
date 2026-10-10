@@ -17,7 +17,7 @@ export const PrimaryButton = ({ text, onClick, disabled = false }) => {
 export const SecondaryButton = ({ text, onClick }) => {
   return (
     <button
-      className="text-white font-bold py-2 px-4 rounded border-[1px] border-white hover:border-gray-300"
+      className="text-white font-bold py-2 px-4 rounded-sm border border-white hover:border-gray-300"
       onClick={onClick}
     >
       {text}

@@ -50,7 +50,7 @@ function Sidebar({ isCollapsed, toggleCollapse }) {
 
       <div
         id="logo-container"
-        className="h-[4.5rem] flex justify-center items-center flex-grow-0"
+        className="h-18 flex justify-center items-center grow-0"
       >
         <h1
           className={`text-2xl font-semibold text-primary ${
@@ -93,8 +93,8 @@ function NavLink({ item, location, isCollapsed }) {
       to={item.path}
       className={`flex items-center px-6 py-3 text-base font-semibold relative ${
         location.pathname === item.path
-          ? "text-[#3C7187] bg-[#3C7187]/10"
-          : "text-gray-600 hover:bg-gray-100 hover:text-[#3C7187]"
+          ? "text-primary bg-primary/10"
+          : "text-gray-600 hover:bg-gray-100 hover:text-primary"
       }`}
     >
       <div className="relative">

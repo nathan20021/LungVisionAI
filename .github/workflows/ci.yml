@@ -6,10 +6,12 @@ on:
       - '**'  
 
 env:
-  PYTHON_VERSION: "3.8"
-  COGNITO_USER_POOL_ID: mock-user-pool-id
-  COGNITO_APP_CLIENT_ID: mock-client-id
-  COGNITO_APP_CLIENT_SECRET: mock-client-secret
+  PYTHON_VERSION: "3.14"
+  ZITADEL_ISSUER: http://zitadel.test
+  ZITADEL_ORGANIZATION_ID: mock-organization-id
+  ZITADEL_PROJECT_ID: mock-project-id
+  ZITADEL_CLIENT_ID: mock-client-id
+  ZITADEL_SERVICE_USER_TOKEN: mock-service-user-token
   AWS_REGION: us-east-1
   AWS_ACCESS_KEY_ID: mock-access-key
   AWS_SECRET_ACCESS_KEY: mock-secret-key
@@ -128,7 +130,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '26'
           cache: 'npm'
           
       - name: Install dependencies

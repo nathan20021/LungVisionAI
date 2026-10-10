@@ -3,48 +3,36 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "autoprefixer": "^10.4.20",
-    "axios": "^1.8.1",
+    "axios": "^1.20.0",
     "dicom-parser": "^1.8.21",
-    "lodash": "^4.17.21",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0",
-    "react-drag-drop-files": "^2.4.0",
-    "react-icons": "^5.3.0",
-    "react-router-dom": "^6.27.0",
-    "react-scripts": "^5.0.1",
-    "tailwindcss": "^3.4.14"
+    "lodash": "^4.18.1",
+    "oidc-client-ts": "^3.5.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-icons": "^5.7.0",
+    "react-router-dom": "^7.18.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "jest",
-    "eject": "react-scripts eject"
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "jest"
   },
   "devDependencies": {
-    "@babel/preset-env": "latest",
-    "@babel/preset-react": "latest",
-    "@testing-library/jest-dom": "latest",
-    "@testing-library/react": "latest",
-    "autoprefixer": "^10.4.21",
-    "axios-mock-adapter": "latest",
-    "babel-jest": "latest",
-    "identity-obj-proxy": "latest",
-    "jest": "latest",
-    "jest-environment-jsdom": "latest",
-    "postcss": "^8.5.3",
-    "tailwindcss": "^3.4.17"
+    "@babel/core": "^8.0.7",
+    "@babel/preset-env": "^8.0.7",
+    "@babel/preset-react": "^8.0.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@vitejs/plugin-react": "^6.1.2",
+    "axios-mock-adapter": "^2.1.0",
+    "babel-jest": "^30.5.2",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^30.5.2",
+    "jest-environment-jsdom": "^30.5.2",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.4"
   }
 }

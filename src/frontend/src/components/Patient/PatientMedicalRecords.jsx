@@ -18,11 +18,11 @@ import { useAuth } from "../../context/Authentication";
 import XrayWithSegmentationBoxes from "./XrayWithSegmentationBoxes";
 
 const AnalysisLoader = () => (
-  <div className="fixed inset-0 bg-white/95 backdrop-filter backdrop-blur-md z-[9999] flex flex-col items-center justify-center">
-    <div className="text-center p-8 rounded-xl shadow-xl bg-white max-w-lg border border-gray-100 translate-y-[100%]">
+  <div className="fixed inset-0 bg-white/95 backdrop-filter backdrop-blur-md z-9999 flex flex-col items-center justify-center">
+    <div className="text-center p-8 rounded-xl shadow-xl bg-white max-w-lg border border-gray-100 translate-y-full">
       <div className="mb-6">
         <svg
-          className="w-24 h-24 mx-auto text-[#3C7187]"
+          className="w-24 h-24 mx-auto text-primary"
           viewBox="0 0 100 100"
           preserveAspectRatio="xMidYMid"
         >
@@ -66,7 +66,7 @@ const AnalysisLoader = () => (
           </circle>
         </svg>
       </div>
-      <h2 className="text-2xl font-bold text-[#3C7187] mb-4 animate-pulse">
+      <h2 className="text-2xl font-bold text-primary mb-4 animate-pulse">
         Analyzing X-Ray
       </h2>
       <p className="text-gray-600 max-w-sm mx-auto mb-10">
@@ -74,13 +74,13 @@ const AnalysisLoader = () => (
         analysis with region-specific findings
       </p>
       <div className="w-full h-2 bg-gray-200 rounded-full mx-auto overflow-hidden">
-        <div className="h-full bg-[#3C7187] animate-progress rounded-full"></div>
+        <div className="h-full bg-primary animate-progress rounded-full"></div>
       </div>
       <div className="mt-6 flex justify-center gap-2">
         {[1, 2, 3, 4, 5].map((i) => (
           <div
             key={i}
-            className="w-2.5 h-2.5 rounded-full bg-[#3C7187] animate-bounce opacity-80"
+            className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce opacity-80"
             style={{ animationDelay: `${i * 0.15}s` }}
           ></div>
         ))}
@@ -243,16 +243,16 @@ function PatientMedicalRecords({ patient }) {
                 onClick={handleBackToRecord}
               >
                 <div className="flex-none">
-                  <div className="w-10 h-10 rounded-full bg-[#3C7187] text-white flex items-center justify-center font-medium text-lg">
+                  <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-medium text-lg">
                     1
                   </div>
                 </div>
-                <div className="flex-1 h-1 bg-[#3C7187]"></div>
+                <div className="flex-1 h-1 bg-primary"></div>
               </div>
               <div className="flex-1 flex items-center">
-                <div className="flex-1 h-1 bg-[#3C7187]"></div>
+                <div className="flex-1 h-1 bg-primary"></div>
                 <div className="flex-none">
-                  <div className="w-10 h-10 rounded-full bg-[#3C7187] text-white flex items-center justify-center font-medium text-lg">
+                  <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-medium text-lg">
                     2
                   </div>
                 </div>
@@ -263,19 +263,19 @@ function PatientMedicalRecords({ patient }) {
                 className="flex-1 text-center opacity-50 cursor-pointer hover:opacity-75 transition-opacity"
                 onClick={handleBackToRecord}
               >
-                <p className="font-medium text-[#3C7187]">Record Details</p>
+                <p className="font-medium text-primary">Record Details</p>
                 <p className="text-sm text-gray-500">
                   Enter medical information
                 </p>
               </div>
               <div className="flex-1 text-center">
-                <p className="font-medium text-[#3C7187]">AI Analysis</p>
+                <p className="font-medium text-primary">AI Analysis</p>
                 <p className="text-sm text-gray-500">Review AI findings</p>
               </div>
             </div>
 
             {/* Rest of the analysis content */}
-            <div className="mt-12 grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Main Analysis Area */}
               <div className="lg:col-span-7 space-y-6">
                 {/* Image Display Area */}
@@ -301,13 +301,13 @@ function PatientMedicalRecords({ patient }) {
 
                   {/* Image Controls */}
                   <div className="absolute top-4 right-4 flex gap-2">
-                    <button className="p-2 bg-black/30 backdrop-blur-sm rounded-full hover:bg-black/40 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none">
+                    <button className="p-2 bg-black/30 backdrop-blur-xs rounded-full hover:bg-black/40 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none">
                       <FiZoomIn className="w-5 h-5 text-white" />
                     </button>
-                    <button className="p-2 bg-black/30 backdrop-blur-sm rounded-full hover:bg-black/40 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none">
+                    <button className="p-2 bg-black/30 backdrop-blur-xs rounded-full hover:bg-black/40 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none">
                       <FiZoomOut className="w-5 h-5 text-white" />
                     </button>
-                    <button className="p-2 bg-black/30 backdrop-blur-sm rounded-full hover:bg-black/40 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none">
+                    <button className="p-2 bg-black/30 backdrop-blur-xs rounded-full hover:bg-black/40 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none">
                       <FiRotateCw className="w-5 h-5 text-white" />
                     </button>
                   </div>
@@ -351,7 +351,7 @@ function PatientMedicalRecords({ patient }) {
                       </h3>
                       <button
                         onClick={() => setIsEditing(!isEditing)}
-                        className="text-sm text-[#3C7187] hover:text-[#2c5465] px-3 py-1 rounded-md hover:bg-gray-50 transition-all duration-200 hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 active:shadow-none"
+                        className="text-sm text-primary hover:text-[#2c5465] px-3 py-1 rounded-md hover:bg-gray-50 transition-all duration-200 hover:shadow-xs hover:-translate-y-0.5 active:translate-y-0 active:shadow-none"
                       >
                         {isEditing ? "Save" : "Edit"}
                       </button>
@@ -373,7 +373,7 @@ function PatientMedicalRecords({ patient }) {
                           Findings & Confidence
                         </h4>
                         {selectedRegion && (
-                          <div className="mt-4 space-y-3">
+                          <div className="space-y-3">
                             <div className="space-y-2">
                               {getSelectedConditions(selectedRegion)
                                 .slice(0, 5)
@@ -388,7 +388,7 @@ function PatientMedicalRecords({ patient }) {
                                     <div className="flex items-center gap-2">
                                       <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
                                         <div
-                                          className="h-full bg-[#3C7187] rounded-full"
+                                          className="h-full bg-primary rounded-full"
                                           style={{
                                             width: `${finding.confidence}%`,
                                           }}
@@ -473,7 +473,7 @@ function PatientMedicalRecords({ patient }) {
               {!viewingRecord && (
                 <button
                   onClick={submitRecord}
-                  className="px-6 py-2.5 bg-[#3C7187] text-white rounded-md hover:bg-[#3C7187]/90 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none font-medium"
+                  className="px-6 py-2.5 bg-primary text-white rounded-md hover:bg-primary/90 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none font-medium"
                 >
                   Submit Analysis
                 </button>
@@ -519,7 +519,7 @@ function PatientMedicalRecords({ patient }) {
         <div className="flex gap-4">
           <button
             onClick={() => setIsCreating(true)}
-            className="flex items-center gap-2 bg-[#3C7187] text-white px-4 py-2 rounded-md hover:bg-[#2c5465] transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none"
+            className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-md hover:bg-[#2c5465] transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none"
           >
             <FiPlus className="text-lg" />
             <span>Create New Record</span>
@@ -564,7 +564,7 @@ function PatientMedicalRecords({ patient }) {
                 <td className="px-6 py-4">
                   <button
                     onClick={() => setViewingRecord(record.id)}
-                    className="text-sm text-[#3C7187] hover:text-[#2c5465] hover:underline"
+                    className="text-sm text-primary hover:text-[#2c5465] hover:underline"
                   >
                     {record.friendlyId || record.recordId || `RID-${record.id}`}
                   </button>
@@ -622,13 +622,13 @@ function PatientMedicalRecords({ patient }) {
           </div>
           <div className="flex gap-2">
             <button
-              className="px-3 py-1 text-sm border rounded text-gray-500 hover:bg-gray-50 transition-all duration-200 hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 active:shadow-none disabled:opacity-50 disabled:hover:bg-white disabled:hover:shadow-none disabled:hover:translate-y-0"
+              className="px-3 py-1 text-sm border rounded-sm text-gray-500 hover:bg-gray-50 transition-all duration-200 hover:shadow-xs hover:-translate-y-0.5 active:translate-y-0 active:shadow-none disabled:opacity-50 disabled:hover:bg-white disabled:hover:shadow-none disabled:hover:translate-y-0"
               disabled
             >
               Previous
             </button>
             <button
-              className="px-3 py-1 text-sm border rounded text-gray-500 hover:bg-gray-50 transition-all duration-200 hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 active:shadow-none disabled:opacity-50 disabled:hover:bg-white disabled:hover:shadow-none disabled:hover:translate-y-0"
+              className="px-3 py-1 text-sm border rounded-sm text-gray-500 hover:bg-gray-50 transition-all duration-200 hover:shadow-xs hover:-translate-y-0.5 active:translate-y-0 active:shadow-none disabled:opacity-50 disabled:hover:bg-white disabled:hover:shadow-none disabled:hover:translate-y-0"
               disabled
             >
               Next

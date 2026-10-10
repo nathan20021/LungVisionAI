@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL;
+const API_BASE_URL = import.meta.env.REACT_APP_API_URL;
 
 axios.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded';
 
@@ -34,16 +34,8 @@ export const executeHTTPRequest = async (
   }
 };
 
-export const signIn = async (email, password) => {
-  return executeHTTPRequest(
-    "POST",
-    "/oauth/sign_in",
-    {},
-    {
-      email,
-      password,
-    }
-  );
+export const getAuthConfig = async () => {
+  return executeHTTPRequest("GET", "/oauth/config");
 };
 
 export const signUp = async (email, password, userDetails) => {
@@ -51,11 +43,12 @@ export const signUp = async (email, password, userDetails) => {
     "POST",
     "/oauth/sign_up",
     {},
+    {},
     {
       email,
       password,
-    },
-    userDetails
+      ...userDetails,
+    }
   );
 };
 

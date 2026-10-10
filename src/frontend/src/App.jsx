@@ -1,6 +1,7 @@
 import React from "react";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import AuthCallbackPage from "./pages/AuthCallbackPage";
 import { Routes, Route, useNavigate, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/Authentication";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -20,6 +21,7 @@ function App() {
           <Route index element={<LoginPage />} />
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />
+          <Route path="callback" element={<AuthCallbackPage />} />
           <Route
             path="settings"
             element={

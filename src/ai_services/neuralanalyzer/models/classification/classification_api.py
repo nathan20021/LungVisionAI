@@ -5,9 +5,6 @@ from collections import defaultdict
 from .transfomer import TransformerNetwork
 from ..Detr.detr_api import get_features
 
-# Backend - Please ignore warning message
-torch._dynamo.config.verbose = True
-
 # Constants
 MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model.ckpt")
 
@@ -58,7 +55,6 @@ model = TransformerNetwork(
     dropout=0.1
 )
 model.to(device)
-model.compile()
 state_dict = {k.replace('_orig_mod.', ''): v for k, v in torch.load(MODEL_PATH, map_location=device, weights_only=True ).items()}
 model.load_state_dict(state_dict)
 model.eval()

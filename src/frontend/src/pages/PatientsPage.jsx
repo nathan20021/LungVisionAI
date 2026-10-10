@@ -98,7 +98,7 @@ function PatientsPage() {
                 disabled={isAddingPatient}
                 className={
                   !isAddingPatient
-                    ? "flex items-center gap-2 bg-[#3C7187] text-white px-4 py-2 rounded-md"
+                    ? "flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-md"
                     : "flex items-center gap-2 bg-[#747474] text-white px-4 py-2 rounded-md"
                 }
               >
@@ -132,7 +132,7 @@ function PatientsPage() {
                         name="name"
                         value={newPatient.name}
                         onChange={handleInputChange}
-                        className="w-[80%] border rounded px-2 py-1"
+                        className="w-[80%] border rounded-sm px-2 py-1"
                       />
                     </td>
                     <td id="contact-inputs" className="py-4">
@@ -143,7 +143,7 @@ function PatientsPage() {
                         value={newPatient.email}
                         onChange={handleInputChange}
                         placeholder="example@gmail.com"
-                        className="w-[90%] border rounded py-1 indent-2"
+                        className="w-[90%] border rounded-sm py-1 indent-2"
                       />
                     </td>
                     <td className="py-4">
@@ -154,7 +154,7 @@ function PatientsPage() {
                         autoComplete="off"
                         value={newPatient.age}
                         onChange={handleInputChange}
-                        className="w-[5rem] border rounded px-2 py-1"
+                        className="w-20 border rounded-sm px-2 py-1"
                       />
                     </td>
                     <td className="py-4">
@@ -162,7 +162,7 @@ function PatientsPage() {
                         name="gender"
                         value={newPatient.gender}
                         onChange={handleInputChange}
-                        className="w-full border rounded px-2 py-1"
+                        className="w-full border rounded-sm px-2 py-1"
                       >
                         <option value="">Select</option>
                         <option value="Male">Male</option>
@@ -200,7 +200,7 @@ function PatientsPage() {
                   >
                     <td className="py-4">
                       <button
-                        className="text-[#3C7187] hover:underline text-left"
+                        className="text-primary hover:underline text-left"
                         onClick={() => handlePatientClick(patient.id)}
                       >
                         {patient.friendlyId}
@@ -230,7 +230,7 @@ function PatientsPage() {
                     </td>
                     <td className="py-4">
                       <button
-                        className="text-[#3C7187] hover:underline text-left"
+                        className="text-primary hover:underline text-left"
                         onClick={() => handlePatientClick(patient.id)}>
                         <FiMoreVertical className="text-gray-500" />
                       </button>
@@ -262,7 +262,7 @@ function PatientsPage() {
                 <button
                   key={index + 1}
                   className={`px-3 py-1 border rounded ${
-                    currentPage === index + 1 ? "bg-[#3C7187] text-white" : ""
+                    currentPage === index + 1 ? "bg-primary text-white" : ""
                   }`}
                   onClick={() => handlePageChange(index + 1)}
                 >

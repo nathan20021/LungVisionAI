@@ -132,14 +132,14 @@ function TopBar() {
                       to={item.path}
                       className={
                         isActivePath(item.path)
-                          ? "text-[#3C7187]"
+                          ? "text-primary"
                           : "text-gray-500"
                       }
                     >
                       {item.label}
                     </Link>
                   ) : (
-                    <span className="text-[#3C7187]">{item.label}</span>
+                    <span className="text-primary">{item.label}</span>
                   )}
                 </React.Fragment>
               ))}

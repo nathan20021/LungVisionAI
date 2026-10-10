@@ -8,11 +8,7 @@ from.mocks.mock_prediction_service import MockPredictionService
 
 # Mock runtime module before any imports
 mock_runtime = MagicMock()
-mock_identity_provider = MockIdentityProvider(
-    user_pool_id="xxx",
-    client_id="xxx",
-    client_secret="xxx"
-)
+mock_identity_provider = MockIdentityProvider()
 mock_prediction_service = MockPredictionService()
 mock_report_generation_service = MockReportGenerationService(mock_identity_provider, mock_prediction_service)
 

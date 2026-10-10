@@ -1,0 +1,23 @@
+{
+  "interactiveLogin": true,
+  "httpServer": "NettyWrapper",
+  "tokenCallbacks": [
+    {
+      "issuerId": "hospital",
+      "tokenExpiry": 300,
+      "requestMappings": [
+        {
+          "requestParam": "code",
+          "match": "*",
+          "claims": {
+            "email": "${subject}@hospital.example",
+            "email_verified": true,
+            "preferred_username": "${subject}@hospital.example",
+            "given_name": "${subject}",
+            "family_name": "(SSO)"
+          }
+        }
+      ]
+    }
+  ]
+}

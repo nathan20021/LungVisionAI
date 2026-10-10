@@ -6,16 +6,18 @@ import PatientOverview from "../components/Patient/PatientOverview";
 import PatientMedicalRecords from "../components/Patient/PatientMedicalRecords";
 import { useParams } from "react-router-dom";
 import { getPatientById } from "../services/api";
+import { useAuth } from "../context/Authentication";
 
 function PatientDetailsPage() {
   const { id: patientId } = useParams();
+  const { token } = useAuth();
   const [patient, setPatient] = useState({});
   const [activeTab, setActiveTab] = useState("Overview");
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
-    getPatientById(patientId).then((data) => setPatient(data));
-  }, []);
+    getPatientById(patientId, token).then((data) => setPatient(data));
+  }, [patientId, token]);
 
   const handleTabChange = (newTab) => {
     if (newTab === activeTab) return;
@@ -41,7 +43,7 @@ function PatientDetailsPage() {
     <div className="flex-1 flex flex-col h-screen">
       <TopBar />
       <div className="flex-1 bg-gray-100 p-6 overflow-auto">
-        <div className="bg-white rounded-lg shadow-sm mb-6">
+        <div className="bg-white rounded-lg shadow-xs mb-6">
           {!_.isEmpty(patient) && (
             <PatientInfo
               patient={patient}

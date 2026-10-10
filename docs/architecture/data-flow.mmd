@@ -1,0 +1,70 @@
+flowchart LR
+  subgraph BROWSER["Browser - PHI enters here"]
+    CL["Clinician"]
+    FEP(["SPA: forms, DICOM to JPEG in browser"])
+    LS[("localStorage: OIDC tokens")]
+  end
+
+  subgraph IDENT["Zitadel - identity system of record"]
+    ZST[("Zitadel: users, roles, patient demographics")]
+  end
+
+  subgraph APPT["App tier"]
+    BEP(["Flask backend"])
+    LOGS[("stdout logs, CloudWatch 1-day configured")]
+  end
+
+  subgraph INFT["Inference"]
+    INF(["NeuralAnalyzer: DETR + classifier"])
+  end
+
+  subgraph AWSS["AWS stores - config unverified"]
+    S3S[("S3: image bytes, key = client filename")]
+    DREC[("DynamoDB capstone_medical_record")]
+    DPRE[("DynamoDB capstone_medical_prescription")]
+  end
+
+  subgraph THIRD["Third parties - outside trust boundary"]
+    LLM["OpenAI gpt-3.5-turbo"]
+    HFH["Hugging Face Hub"]
+  end
+
+  subgraph ART["Model artifacts"]
+    GITW[("Git repo: classifier model.ckpt, notebook outputs")]
+    HOSTM[("Host /models: detr.ckpt, provenance unknown")]
+  end
+
+  subgraph TRN["Training - Kaggle, offline"]
+    KDS[("Kaggle datasets: object-CXR, CheXpert, support devices")]
+    NBK(["cyc2cyc-50 CycleGAN notebook"])
+    KOUT[("Kaggle working dir: CycleGAN .h5")]
+  end
+
+  CL -->|"D-002 patient details PHI, D-004 image file"| FEP
+  FEP -->|"D-002 demographics PHI"| BEP
+  BEP -->|"D-001 D-002 users, grants, metadata"| ZST
+  ZST -->|"D-003 JWT access and refresh tokens"| LS
+  FEP -->|"D-006 JPEG bytes PHI, presigned PUT"| S3S
+  FEP -->|"D-007 xRayUrl, D-012 record with client-supplied report"| BEP
+  BEP -->|"D-012 PutItem"| DREC
+  DPRE -->|"D-013 read with record"| BEP
+  S3S -->|"D-006 GET bytes"| BEP
+  BEP -->|"D-006 multipart image"| INF
+  INF -->|"D-008 scores, D-009 boxes, D-005 DICOM tags if DICOM"| BEP
+  BEP -->|"D-010 PHI egress: scores + patient profile"| LLM
+  LLM -->|"D-011 findings and impression"| BEP
+  BEP -->|"D-008 D-009 D-011 transient, not persisted"| FEP
+  S3S -->|"D-006 img GET via bare URL"| FEP
+  BEP -->|"D-014 overlay JPEG, route unused by UI"| S3S
+  INF -->|"D-015 predictions and DICOM tags logged"| LOGS
+  BEP -->|"D-015 status and URLs on error"| LOGS
+  GITW -->|"D-019 classifier weights at import"| INF
+  HOSTM -->|"D-020 DETR checkpoint"| INF
+  HFH -->|"D-021 base weights and processor"| INF
+  KDS -->|"D-017 images and labels"| NBK
+  NBK -->|"D-018 checkpoints"| KOUT
+  NBK -->|"D-023 executed notebook with outputs"| GITW
+  KOUT -.->|"GAP: no promotion path to inference"| INF
+
+  classDef gap stroke-dasharray:5 5
+  class HOSTM gap

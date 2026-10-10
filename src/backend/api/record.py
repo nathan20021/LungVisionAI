@@ -1,13 +1,14 @@
-from decorators.login_required import authentication_required
-from flask import Blueprint, jsonify, request
+from decorators.login_required import requires_doctor_or_own_patient_scope, requires_scopes
+from flask import Blueprint, g, jsonify, request
 from runtime import MedicalRecordService, MedicalPrescriptionService
 from runtime import ReportGenerationService, PredictionService
+from scopes import DOCTOR_RECORDS_READ, DOCTOR_RECORDS_WRITE, PATIENT_RECORDS_READ
 
 record_blueprint = Blueprint("record", __name__)
 
 
 @record_blueprint.route("/records", methods=["GET"])
-@authentication_required
+@requires_doctor_or_own_patient_scope(DOCTOR_RECORDS_READ, PATIENT_RECORDS_READ)
 def paginated_records_by_userId(userId):
     limit = request.args.get("limit", default=10, type=int)
     cursor = request.args.get("cursor", default=None, type=str)
@@ -21,41 +22,47 @@ def paginated_records_by_userId(userId):
     )
 
 
-@record_blueprint.route("/records/<recordId>", methods=["GET", "POST"])
-@authentication_required
-def handle_record_by_id(userId, recordId):
-    if request.method == "GET":
-        record = MedicalRecordService.get_record_by_id(recordId)
-        if not record:
-            return (
-                jsonify({}),
-                404,
-            )
-        prescriptions = (
-            MedicalPrescriptionService.get_paginated_prescription_by_recordId(
-                recordId, 10
-            )
-        )
-        record["prescriptions"] = prescriptions
+@record_blueprint.route("/records/<recordId>", methods=["GET"])
+@requires_doctor_or_own_patient_scope(DOCTOR_RECORDS_READ, PATIENT_RECORDS_READ)
+def get_record_by_id(userId, recordId):
+    record = MedicalRecordService.get_record_by_id(recordId)
+    # patients only see records that belong to them
+    if not record or (
+        not g.auth.has_scope(DOCTOR_RECORDS_READ) and record.get("userId") != g.auth.user_id
+    ):
         return (
-            jsonify(record),
-            200,
+            jsonify({}),
+            404,
         )
-    elif request.method == "POST":
-        record = {
-            "xRayUrl": request.json.get("xRayUrl", ""),
-            "note": request.json.get("note", ""),
-            "prescription": request.json.get("prescription", []),
-        }
-        updated_record = MedicalRecordService.update_record_by_id(recordId, record)
-        return (
-            jsonify(updated_record),
-            200,
+    prescriptions = (
+        MedicalPrescriptionService.get_paginated_prescription_by_recordId(
+            recordId, 10
         )
+    )
+    record["prescriptions"] = prescriptions
+    return (
+        jsonify(record),
+        200,
+    )
+
+
+@record_blueprint.route("/records/<recordId>", methods=["POST"])
+@requires_scopes(DOCTOR_RECORDS_WRITE)
+def update_record_by_id(userId, recordId):
+    record = {
+        "xRayUrl": request.json.get("xRayUrl", ""),
+        "note": request.json.get("note", ""),
+        "prescription": request.json.get("prescription", []),
+    }
+    updated_record = MedicalRecordService.update_record_by_id(recordId, record)
+    return (
+        jsonify(updated_record),
+        200,
+    )
 
 
 @record_blueprint.route("/record", methods=["POST"])
-@authentication_required
+@requires_scopes(DOCTOR_RECORDS_WRITE)
 def create_new_record(userId):
     record_info = {
         "xRayUrl": request.json.get("xRayUrl", ""),
@@ -72,7 +79,7 @@ def create_new_record(userId):
 
 
 @record_blueprint.route("/records/prediction", methods=["POST"])
-@authentication_required
+@requires_scopes(DOCTOR_RECORDS_WRITE)
 def generate_prediction_and_report(userId):
     xRayUrl = request.json.get("xRayUrl", "")
     (report, prediction) = ReportGenerationService.generate_report(userId, xRayUrl)
@@ -88,7 +95,7 @@ def generate_prediction_and_report(userId):
     )
 
 @record_blueprint.route("/records/segments", methods=["POST"])
-@authentication_required
+@requires_scopes(DOCTOR_RECORDS_WRITE)
 def generate_segments_from_xray(userId):
     xRayUrl = request.json.get("xRayUrl", "")
     segmented_image_url = PredictionService.segment_from_url(xRayUrl)
@@ -99,7 +106,7 @@ def generate_segments_from_xray(userId):
     )
 
 @record_blueprint.route("/records/segmentation-boxes", methods=["POST"])
-@authentication_required
+@requires_scopes(DOCTOR_RECORDS_WRITE)
 def generate_segment_boxes_from_xray(userId):
     xRayUrl = request.json.get("xRayUrl", "")
     res = PredictionService.segment_boxes_from_url(xRayUrl)

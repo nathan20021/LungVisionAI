@@ -1,5 +1,5 @@
 from .config import Config
-from .data.aws_cognito import CognitoIdentityProvider
+from .data.zitadel import ZitadelIdentityProvider
 from .data.prediction_services import PredictionService as PS
 from .data.aws_dynamodb.medical_record_service import MedicalRecordService as MRS
 from .data.aws_dynamodb.medical_prescription_service import MedicalPrescriptionService as MPS
@@ -9,10 +9,14 @@ from .logger import Logger
 
 RuntimeConfig = Config()
 
-IdentityProvider = CognitoIdentityProvider(
-    user_pool_id=RuntimeConfig.get("COGNITO_USER_POOL_ID"),
-    client_id=RuntimeConfig.get("COGNITO_APP_CLIENT_ID"),
-    client_secret=RuntimeConfig.get("COGNITO_APP_CLIENT_SECRET"),
+IdentityProvider = ZitadelIdentityProvider(
+    issuer=RuntimeConfig.get("ZITADEL_ISSUER"),
+    api_url=RuntimeConfig.get("ZITADEL_API_URL"),
+    organization_id=RuntimeConfig.get("ZITADEL_ORGANIZATION_ID"),
+    project_id=RuntimeConfig.get("ZITADEL_PROJECT_ID"),
+    client_id=RuntimeConfig.get("ZITADEL_CLIENT_ID"),
+    service_token=RuntimeConfig.get("ZITADEL_SERVICE_USER_TOKEN"),
+    sso_default_role=RuntimeConfig.get("ZITADEL_SSO_DEFAULT_ROLE"),
 )
 
 PredictionService = PS()
