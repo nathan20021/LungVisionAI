@@ -1,8 +1,11 @@
+import atexit
+
 from flask import Flask, json, make_response, request
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
-from runtime import RuntimeConfig
+from runtime import DatabasePool, RuntimeConfig
+from runtime.data.postgres.base_service import create_schema
 
 from api.oauth import oauth_bp
 from api.user import user_blueprint
@@ -17,6 +20,11 @@ ALLOWED_ORIGINS = [
     "http://www.neuralanalyzer.ca",
     "https://www.neuralanalyzer.ca"
 ]
+
+# fail at startup, not on the first request, when Postgres is unreachable
+DatabasePool.open(wait=True)
+atexit.register(DatabasePool.close)
+create_schema(DatabasePool)
 
 app = Flask(__name__)
 CORS(

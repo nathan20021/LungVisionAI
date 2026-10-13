@@ -26,6 +26,10 @@ class Config:
             "FRONTEND_URL": os.getenv("FRONTEND_URL", default="http://localhost:3000"),
             "AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID", default=None),
             "AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY", default=None),
+            # dev default: the backend-db compose service, reached from the host
+            "DATABASE_URL": os.getenv(
+                "DATABASE_URL", default="postgresql://root:password@localhost:5432/lungvisionAI"
+            ),
             "ZITADEL_ISSUER": _zitadel_setting("ZITADEL_ISSUER"),
             "ZITADEL_API_URL": _zitadel_setting(
                 "ZITADEL_API_URL", default=_zitadel_setting("ZITADEL_ISSUER")

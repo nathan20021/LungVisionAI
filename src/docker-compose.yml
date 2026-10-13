@@ -27,9 +27,12 @@ services:
       - ZITADEL_ISSUER=http://${HOST}:${ZITADEL_HOST_PORT:-8080}
       - ZITADEL_API_URL=http://zitadel:8080
       - ZITADEL_CONFIG_FILE=/lungvision-auth/zitadel.json
+      - DATABASE_URL=postgresql://root:${BACKEND_DB_PASSWORD:-password}@backend-db:5432/lungvisionAI
     command: python app.py
     image: neuralanalyzer/backend:latest
     depends_on:
+      backend-db:
+        condition: service_healthy
       neuralanalyzer_model:
         condition: service_started
       zitadel-bootstrap:
@@ -42,6 +45,27 @@ services:
     networks:
       - backend_private_network
       - zitadel_network
+
+  # Medical records and prescriptions. The backend creates its tables on start
+  # (backend/runtime/data/postgres/schema.sql).
+  backend-db:
+    image: postgres:17.10-alpine
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: ${BACKEND_DB_PASSWORD:-password}
+      POSTGRES_DB: lungvisionAI
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d lungvisionAI -U root"]
+      interval: 5s
+      timeout: 30s
+      retries: 20
+    ports:
+      # host-only, for running the backend or its tests outside compose
+      - 127.0.0.1:5432:5432
+    volumes:
+      - backend-db-data:/var/lib/postgresql/data
+    networks:
+      - backend_private_network
 
   neuralanalyzer_model:
     build: ./ai_services/neuralanalyzer
@@ -224,6 +248,7 @@ networks:
     driver: bridge
 
 volumes:
+  backend-db-data:
   zitadel-db-data:
   zitadel-bootstrap:
   zitadel-admin:
