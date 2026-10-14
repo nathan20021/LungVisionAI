@@ -17,14 +17,17 @@ flowchart LR
     BE["Flask backend :5000"]
   end
 
+  subgraph DATA["Backend data - compose self-hosted"]
+    PG[("backend-db Postgres 17: medical_records, medical_prescriptions")]
+  end
+
   subgraph INFER["Inference tier"]
     NA["NeuralAnalyzer Flask :9999 - DETR + classifier"]
     TXV["TorchXRayVision - source removed"]
   end
 
-  subgraph AWS["AWS stores - referenced in code, not in IaC"]
+  subgraph AWS["AWS - referenced in code, not in IaC"]
     S3[("S3 neuralanalyzer-xrays")]
-    DDB[("DynamoDB record and prescription tables")]
   end
 
   subgraph EXT["External SaaS"]
@@ -37,7 +40,7 @@ flowchart LR
   end
 
   U --> FE
-  FE -->|"I-001 to I-022 HTTPS REST, Bearer JWT"| BE
+  FE -->|"I-001 to I-022 HTTP REST, Bearer JWT"| BE
   FE -->|"I-030 to I-035 OIDC code + PKCE, SDK-derived"| ZPX
   ZPX -->|"I-032 login UI routes"| ZL
   ZPX -->|"I-032 API and OIDC routes, h2c"| ZA
@@ -47,9 +50,9 @@ flowchart LR
   ZB -->|"I-043 admin and management API, admin PAT"| ZA
   BE -->|"I-040 JWKS GET"| ZA
   BE -->|"I-041 I-042 user and authorization API, service PAT"| ZA
+  BE -->|"I-054 SQL queries, I-055 startup DDL, psycopg pool"| PG
   FE -->|"I-025 presigned PUT, I-026 img GET bare URL"| S3
   BE -->|"I-051 GET xRayUrl, I-052 PutObject"| S3
-  BE -->|"I-053 Query, PutItem, UpdateItem"| DDB
   BE -->|"I-060 to I-062 HTTP multipart, no timeout"| NA
   BE -->|"I-070 HTTPS chat completion"| OAI
   NA -->|"I-071 from_pretrained at startup, SDK-derived"| HF

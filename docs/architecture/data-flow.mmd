@@ -14,14 +14,17 @@ flowchart LR
     LOGS[("stdout logs, CloudWatch 1-day configured")]
   end
 
+  subgraph PGS["Backend Postgres - compose volume, no backups"]
+    DREC[("medical_records: record, report JSONB")]
+    DPRE[("medical_prescriptions: FK record_id")]
+  end
+
   subgraph INFT["Inference"]
     INF(["NeuralAnalyzer: DETR + classifier"])
   end
 
-  subgraph AWSS["AWS stores - config unverified"]
+  subgraph AWSS["AWS S3 - config unverified"]
     S3S[("S3: image bytes, key = client filename")]
-    DREC[("DynamoDB capstone_medical_record")]
-    DPRE[("DynamoDB capstone_medical_prescription")]
   end
 
   subgraph THIRD["Third parties - outside trust boundary"]
@@ -46,8 +49,10 @@ flowchart LR
   ZST -->|"D-003 JWT access and refresh tokens"| LS
   FEP -->|"D-006 JPEG bytes PHI, presigned PUT"| S3S
   FEP -->|"D-007 xRayUrl, D-012 record with client-supplied report"| BEP
-  BEP -->|"D-012 PutItem"| DREC
-  DPRE -->|"D-013 read with record"| BEP
+  BEP -->|"D-012 INSERT, UPDATE"| DREC
+  DREC -->|"D-012 SELECT, report omitted in lists"| BEP
+  DPRE -->|"D-013 SELECT, embedded in record read"| BEP
+  BEP -->|"D-013 INSERT, UPDATE, no UI caller"| DPRE
   S3S -->|"D-006 GET bytes"| BEP
   BEP -->|"D-006 multipart image"| INF
   INF -->|"D-008 scores, D-009 boxes, D-005 DICOM tags if DICOM"| BEP
@@ -57,7 +62,7 @@ flowchart LR
   S3S -->|"D-006 img GET via bare URL"| FEP
   BEP -->|"D-014 overlay JPEG, route unused by UI"| S3S
   INF -->|"D-015 predictions and DICOM tags logged"| LOGS
-  BEP -->|"D-015 status and URLs on error"| LOGS
+  BEP -->|"D-015 URLs and DB errors on failure"| LOGS
   GITW -->|"D-019 classifier weights at import"| INF
   HOSTM -->|"D-020 DETR checkpoint"| INF
   HFH -->|"D-021 base weights and processor"| INF
