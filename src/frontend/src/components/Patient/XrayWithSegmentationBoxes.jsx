@@ -5,6 +5,7 @@ export const XrayWithSegmentationBoxes = ({
   boundingBoxes,
   onSelectLabel,
   selectedLabel,
+  flaggedLabels = [],
 }) => {
   const parentRef = useRef(null);
   const [parentDimensions, setParentDimensions] = useState({
@@ -36,7 +37,13 @@ export const XrayWithSegmentationBoxes = ({
 
   return (
     <div ref={parentRef} style={{ position: "relative" }}>
-      <img src={src} alt="X-ray" width={800} height={800} />
+      <img
+        src={src}
+        alt="X-ray"
+        width={800}
+        height={800}
+        className="block w-full h-auto rounded-sm"
+      />
       {boundingBoxes.map((box, index) => (
         <SegmentationBoxes
           key={index}
@@ -50,6 +57,7 @@ export const XrayWithSegmentationBoxes = ({
             label: box.label,
             onSelectLabel: onSelectLabel,
             selectedLabel: selectedLabel,
+            isFlagged: flaggedLabels.includes(box.label),
           }}
         />
       ))}
@@ -66,17 +74,27 @@ const SegmentationBoxes = ({
   y2,
   options,
 }) => {
-  const { color, label, onSelectLabel, selectedLabel } = options;
+  const { color, label, onSelectLabel, selectedLabel, isFlagged } = options;
   const isSelected = selectedLabel === label;
+  // red-400 (as r, g, b) stays visible on the grey of an X-ray
+  const flagRgb = "248, 113, 113";
   const style = {
     position: "absolute",
-    border: isSelected ? `3px solid red` : `1px solid rgba(200, 200, 200, 0.7)`,
+    border: isSelected
+      ? `2px solid ${isFlagged ? `rgb(${flagRgb})` : "var(--color-secondary)"}`
+      : isFlagged
+      ? `1.5px solid rgba(${flagRgb}, 0.85)`
+      : "1px dashed rgba(255, 255, 255, 0.3)",
     boxSizing: "border-box",
     width: `${(x2 - x1) * imageWidth}px`,
     height: `${(y2 - y1) * imageHeight}px`,
     left: `${x1 * imageWidth}px`,
     top: `${y1 * imageHeight}px`,
-    backgroundColor: isSelected ? 'rgba(255, 0, 0, 0.05)' : 'transparent',
+    backgroundColor: isSelected
+      ? isFlagged
+        ? `rgba(${flagRgb}, 0.18)`
+        : "rgba(104, 176, 231, 0.16)"
+      : "transparent",
     transition: 'all 0.2s ease-in-out',
   };
 

@@ -49,12 +49,15 @@ def get_record_by_id(userId, recordId):
 @record_blueprint.route("/records/<recordId>", methods=["POST"])
 @requires_scopes(DOCTOR_RECORDS_WRITE)
 def update_record_by_id(userId, recordId):
-    record = {
-        "xRayUrl": request.json.get("xRayUrl", ""),
-        "note": request.json.get("note", ""),
-        "prescription": request.json.get("prescription", []),
-    }
+    # fields left out of the body keep their stored value
+    fields = ("xRayUrl", "note", "priority", "treatmentPlan", "report", "prescription")
+    record = {field: request.json.get(field) for field in fields}
     updated_record = MedicalRecordService.update_record_by_id(recordId, record)
+    if not updated_record:
+        return (
+            jsonify({}),
+            404,
+        )
     return (
         jsonify(updated_record),
         200,

@@ -10,6 +10,8 @@ LIST_COLUMNS = """
     to_json(created_at) AS created_at, to_json(updated_at) AS updated_at
 """
 
+UPDATABLE_FIELDS = ("xRayUrl", "note", "priority", "treatmentPlan", "report", "prescription")
+
 
 class MedicalRecordService(BasePostgresService):
     table_name = "medical_records"
@@ -33,13 +35,23 @@ class MedicalRecordService(BasePostgresService):
         )
 
     def update_record_by_id(self, uuid, record):
+        """Fields that are missing or None keep their stored value."""
+        params = {key: record.get(key) for key in UPDATABLE_FIELDS}
+        for key in ("report", "prescription"):
+            if params[key] is not None:
+                params[key] = Jsonb(params[key])
         return super().query_one(
             f"""
             UPDATE medical_records
-            SET x_ray_url = %(xRayUrl)s, note = %(note)s, prescription = %(prescription)s,
+            SET x_ray_url = COALESCE(%(xRayUrl)s, x_ray_url),
+                note = COALESCE(%(note)s, note),
+                priority = COALESCE(%(priority)s, priority),
+                treatment_plan = COALESCE(%(treatmentPlan)s, treatment_plan),
+                report = COALESCE(%(report)s, report),
+                prescription = COALESCE(%(prescription)s, prescription),
                 updated_at = now()
             WHERE id = %(id)s
             RETURNING {self.columns}
             """,
-            {**record, "id": uuid, "prescription": Jsonb(record["prescription"])},
+            {**params, "id": uuid},
         )

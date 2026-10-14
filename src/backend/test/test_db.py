@@ -98,6 +98,19 @@ def test_update_record(records):
     assert records.get_record_by_id(created["id"]) == updated
 
 
+def test_update_record_keeps_fields_left_out(records):
+    created = records.create_new_record("patient-1", record_body())
+    report = {**REPORT, "impression": "Edited by the physician."}
+
+    updated = records.update_record_by_id(
+        created["id"], {"note": "", "priority": "High", "treatmentPlan": "Rest", "report": report}
+    )
+
+    assert (updated["note"], updated["priority"], updated["treatmentPlan"]) == ("", "High", "Rest")
+    assert updated["report"] == report
+    assert updated["xRayUrl"] == created["xRayUrl"]
+
+
 def test_unknown_or_malformed_ids_are_not_found(records):
     update = {"xRayUrl": "", "note": "", "prescription": []}
     assert records.get_record_by_id(str(uuid.uuid4())) is None
@@ -144,3 +157,14 @@ def test_prescription_needs_an_existing_record(prescriptions):
     assert prescriptions.create_new_prescription(str(uuid.uuid4()), prescription_body()) is None
     assert prescriptions.create_new_prescription("not-a-uuid", prescription_body()) is None
     assert prescriptions.get_paginated_prescription_by_recordId("not-a-uuid", 10) == {"data": [], "next": None}
+
+
+def test_prescription_is_deleted_only_from_its_record(records, prescriptions):
+    record = records.create_new_record("patient-1", record_body())
+    other = records.create_new_record("patient-1", record_body())
+    prescription = prescriptions.create_new_prescription(record["id"], prescription_body())
+
+    assert prescriptions.delete_prescription_by_id(other["id"], prescription["id"]) is None
+    assert prescriptions.delete_prescription_by_id(record["id"], prescription["id"]) == prescription
+    assert prescriptions.get_prescription_by_id(prescription["id"]) is None
+    assert prescriptions.delete_prescription_by_id(record["id"], "not-a-uuid") is None

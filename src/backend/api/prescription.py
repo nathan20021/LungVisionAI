@@ -51,6 +51,21 @@ def update_prescription_by_id(userId, recordId, prescriptionId):
     )
 
 
+@prescription_blueprint.route("/prescriptions/<prescriptionId>", methods=["DELETE"])
+@requires_scopes(DOCTOR_RECORDS_WRITE)
+def delete_prescription_by_id(userId, recordId, prescriptionId):
+    deleted = MedicalPrescriptionService.delete_prescription_by_id(recordId, prescriptionId)
+    if not deleted:
+        return (
+            jsonify({}),
+            404,
+        )
+    return (
+        jsonify(deleted),
+        200,
+    )
+
+
 @prescription_blueprint.route("/prescription", methods=["POST"])
 @requires_scopes(DOCTOR_RECORDS_WRITE)
 def create_new_prescription_for_record_id(userId, recordId):

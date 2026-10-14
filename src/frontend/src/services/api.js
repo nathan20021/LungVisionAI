@@ -280,6 +280,46 @@ export const getPrescriptionById = async (userId, recordId, prescriptionId, toke
   );
 };
 
+export const updatePrescription = async (userId, recordId, prescriptionId, prescription, token) => {
+  return executeHTTPRequest(
+    "POST",
+    `/users/${userId}/records/${recordId}/prescriptions/${prescriptionId}`,
+    {
+      Authorization: `Bearer ${token}`,
+    },
+    {},
+    {
+      "dosage": prescription?.dosage || "",
+      "dosageDuration": prescription?.dosageDuration || "",
+      "dosageFrequency": prescription?.dosageFrequency || "",
+      "time": prescription?.time || "",
+    }
+  );
+};
+
+export const deletePrescription = async (userId, recordId, prescriptionId, token) => {
+  return executeHTTPRequest(
+    "DELETE",
+    `/users/${userId}/records/${recordId}/prescriptions/${prescriptionId}`,
+    {
+      Authorization: `Bearer ${token}`,
+    }
+  );
+};
+
+// Fields left out of `fields` keep their stored value
+export const updateMedicalRecord = async (userId, recordId, fields, token) => {
+  return executeHTTPRequest(
+    "POST",
+    `/users/${userId}/records/${recordId}`,
+    {
+      Authorization: `Bearer ${token}`,
+    },
+    {},
+    fields
+  );
+};
+
 export const createPrescription = async (userId, recordId, prescription, token) => {
   return executeHTTPRequest(
     "POST",

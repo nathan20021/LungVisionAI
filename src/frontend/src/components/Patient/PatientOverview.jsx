@@ -1,87 +1,140 @@
 import React, { useState, useEffect } from "react";
-import {
-  getMedicalRecordsForPatient,
-  getMedicalRecord,
-} from "../../services/api";
+import { FiFileText, FiPlus } from "react-icons/fi";
+import { getMedicalRecord } from "../../services/api";
 import { useAuth } from "../../context/Authentication";
+import { formatDate, TextSection } from "./ViewMedicalRecord";
 
-function PatientOverview({ patient }) {
+// records: the patient's record list, null while it loads
+function PatientOverview({ patient, records, onCreate, onView }) {
   const { token } = useAuth();
   const [latestRecord, setLatestRecord] = useState(null);
+  const [loadError, setLoadError] = useState(false);
+
+  const latestRecordId = records?.length
+    ? [...records].sort(
+        (a, b) => new Date(b.timeCreated) - new Date(a.timeCreated)
+      )[0].id
+    : null;
 
   useEffect(() => {
-    getMedicalRecordsForPatient(patient.id, token).then((data) => {
-      data.sort((a, b) => new Date(b.timeCreated) - new Date(a.timeCreated));
-      const firstRecordId = data[0]?.id;
-      if (!firstRecordId) return;
-      getMedicalRecord(patient.id, firstRecordId, token).then((fullRecord) => {
-        if (!data) return;
-        setLatestRecord(fullRecord);
-      });
-    });
-  }, [patient]);
+    if (!latestRecordId) return;
+    setLoadError(false);
+    getMedicalRecord(patient.id, latestRecordId, token)
+      .then(setLatestRecord)
+      .catch(() => setLoadError(true));
+  }, [patient.id, latestRecordId, token]);
 
-  const prescriptions = latestRecord?.prescriptions?.data || [];
+  if (records?.length === 0) {
+    return (
+      <div className="border border-dashed border-gray-300 rounded-xl px-6 py-14 text-center">
+        <div className="w-12 h-12 mx-auto rounded-full bg-[#eaf2f5] text-primary flex items-center justify-center">
+          <FiFileText className="w-6 h-6" />
+        </div>
+        <h2 className="mt-4 text-lg font-semibold text-gray-900">
+          No medical records yet
+        </h2>
+        <p className="mt-1 text-sm text-gray-600 max-w-sm mx-auto">
+          Upload a chest X-ray to create the first record for {patient.name}.
+          Clinical notes, AI findings and prescriptions will show up here.
+        </p>
+        <button
+          type="button"
+          onClick={onCreate}
+          className="mt-6 inline-flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-md hover:bg-[#2c5465] active:scale-[0.97] transition font-medium"
+        >
+          <FiPlus className="text-lg" />
+          Create first record
+        </button>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="border border-gray-200 rounded-xl px-6 py-8 text-center text-sm text-gray-600">
+        The latest record could not be loaded.
+      </div>
+    );
+  }
+
+  if (!latestRecord) {
+    return (
+      <div
+        className="border border-gray-200 rounded-xl p-6 animate-pulse"
+        aria-busy="true"
+        aria-label="Loading latest record"
+      >
+        <div className="h-5 w-32 bg-gray-200 rounded-sm mb-6" />
+        <div className="grid gap-6 md:grid-cols-3">
+          <div className="h-20 bg-gray-200 rounded-sm" />
+          <div className="h-20 bg-gray-200 rounded-sm" />
+          <div className="h-20 bg-gray-200 rounded-sm" />
+        </div>
+      </div>
+    );
+  }
+
+  const prescriptions = latestRecord.prescriptions?.data || [];
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <div className="border border-gray-200 rounded-2xl">
-          <div className="flex items-center gap-2 px-6 pt-6 mb-4">
-            <div className="flex items-center gap-2 bg-[#F8F8F8] px-3 py-1.5 rounded-full">
-              <img src="/health.svg" className="w-5 h-5" />
-              <span className="font-medium text-[#7F7F7F]">Clinical Notes</span>
-            </div>
-          </div>
-          <div className="px-6 pb-6">
-            <h1>{latestRecord?.note}</h1>
-          </div>
+    <section className="border border-gray-200 rounded-xl">
+      <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-gray-200">
+        <div>
+          <h2 className="text-base font-semibold text-gray-900">
+            Latest record
+          </h2>
+          <p className="text-sm text-gray-600">
+            {formatDate(latestRecord.created_at)}
+          </p>
         </div>
+        <button
+          type="button"
+          onClick={() => onView(latestRecord.id)}
+          className="text-sm font-medium text-primary hover:text-[#2c5465] px-3 py-1.5 rounded-md hover:bg-gray-50 transition"
+        >
+          View record
+        </button>
       </div>
-
-      <div className="mb-6">
-        <div className="border border-gray-200 rounded-2xl">
-          <div className="flex items-center gap-2 px-6 pt-6 mb-4">
-            <div className="flex items-center gap-2 bg-[#F8F8F8] px-3 py-1.5 rounded-full">
-              <img src="/info.svg" alt="Treatment Plan" className="w-5 h-5" />
-              <span className="font-medium text-[#7F7F7F]">Treatment plan</span>
-            </div>
-          </div>
-          <div className="px-6 pb-6">
-            <div className="space-y-6">
-              {prescriptions.map((treatment, index) => (
-                <div key={index} className={index !== 0 ? "pt-6 border-t" : ""}>
-                  <div className="flex">
-                    <h3 className="font-semibold">{`${treatment.dosage}`} </h3>
-                    <p>
-                      -
-                      {` ${treatment.dosageFrequency}@${
-                        treatment.time || "8PM"
-                      }`}
-                    </p>
-                  </div>
-                </div>
+      <div className="grid gap-6 p-6 md:grid-cols-3">
+        <TextSection
+          title="Clinical notes"
+          text={latestRecord.note}
+          emptyText="No clinical notes."
+        />
+        <TextSection
+          title="Treatment plan"
+          text={latestRecord.treatmentPlan}
+          emptyText="No treatment plan."
+        />
+        <div>
+          <h2 className="text-base font-semibold text-gray-900 mb-1.5">
+            Prescriptions
+          </h2>
+          {prescriptions.length > 0 ? (
+            <ul className="divide-y divide-gray-100">
+              {prescriptions.map((prescription) => (
+                <li key={prescription.id} className="py-2 first:pt-0">
+                  <p className="text-[15px] font-semibold text-gray-900">
+                    {prescription.dosage}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {[
+                      prescription.dosageFrequency,
+                      prescription.time,
+                      prescription.dosageDuration,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </li>
               ))}
-            </div>
-          </div>
+            </ul>
+          ) : (
+            <p className="text-[15px] text-gray-500">No prescriptions.</p>
+          )}
         </div>
       </div>
-
-      {/* AI Analysis Section
-      <div>
-        <div className="border border-gray-200 rounded-2xl">
-          <div className="flex items-center gap-2 px-6 pt-6 mb-4">
-            <div className="flex items-center gap-2 bg-[#F8F8F8] px-3 py-1.5 rounded-full">
-              <img src="/report.svg" alt="AI Analysis" className="w-5 h-5" />
-              <span className="font-medium text-[#7F7F7F]">AI Analysis</span>
-            </div>
-          </div>
-          <div className="px-6 pb-6">
-            This is another section that needed to be filled out
-          </div>
-        </div>
-      </div> */}
-    </div>
+    </section>
   );
 }
 

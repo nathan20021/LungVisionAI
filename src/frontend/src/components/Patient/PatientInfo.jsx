@@ -3,9 +3,7 @@ import { FiMail, FiPhone } from "react-icons/fi";
 import { Link } from "react-router-dom";
 import { FaRegUser } from "react-icons/fa";
 
-function PatientInfo({ patient, activeTab, setActiveTab }) {
-  const tabs = ["Overview", "Medical Record"];
-
+function PatientInfo({ patient }) {
   return (
     <div className="bg-white rounded-lg shadow-xs">
       {/* Patient Info Section */}
@@ -52,39 +50,7 @@ function PatientInfo({ patient, activeTab, setActiveTab }) {
         </div>
       </div>
 
-      {/* Tabs Navigation */}
-      <div className="flex gap-8 px-6">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            className={`
-              py-4 px-2 relative transition-colors duration-200 ease-in-out
-              ${
-                activeTab === tab
-                  ? "text-primary font-medium"
-                  : "text-gray-600 hover:text-primary"
-              }
-              outline-hidden focus:outline-hidden active:outline-hidden select-none
-              -webkit-tap-highlight-color-transparent
-            `}
-            onClick={() => setActiveTab(tab)}
-          >
-            {tab}
-            <div
-              className={`
-                absolute bottom-0 left-0 right-0 h-0.5
-                transition-all duration-200 ease-in-out
-                ${
-                  activeTab === tab
-                    ? "bg-primary opacity-100"
-                    : "bg-primary opacity-0"
-                }
-              `}
-            />
-          </button>
-        ))}
-      </div>
-      {/* Horizontal divider below tabs */}
+      {/* Horizontal divider below patient info */}
       <div className="border-b border-gray-200"></div>
     </div>
   );

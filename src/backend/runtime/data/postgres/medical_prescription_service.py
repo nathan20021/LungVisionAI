@@ -39,3 +39,14 @@ class MedicalPrescriptionService(BasePostgresService):
             """,
             {**prescription, "id": uuid},
         )
+
+    def delete_prescription_by_id(self, recordId, uuid):
+        """Delete a prescription of recordId. Returns it, or None if that record has no such prescription."""
+        return super().query_one(
+            f"""
+            DELETE FROM medical_prescriptions
+            WHERE id = %(id)s AND record_id = %(recordId)s
+            RETURNING {self.columns}
+            """,
+            {"id": uuid, "recordId": recordId},
+        )

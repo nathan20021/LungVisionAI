@@ -2,14 +2,35 @@ import React from "react";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import AuthCallbackPage from "./pages/AuthCallbackPage";
-import { Routes, Route, useNavigate, Navigate } from "react-router-dom";
-import { AuthProvider } from "./context/Authentication";
+import {
+  Routes,
+  Route,
+  useNavigate,
+  useParams,
+  Navigate,
+} from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/Authentication";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 // import DashboardPage from "./pages/DashboardPage";
 import PatientsPage from "./pages/PatientsPage";
 import SettingsPage from "./pages/SettingPage";
 import PatientDetailsPage from "./pages/PatientDetailsPage";
-import CreateMedicalRecord from "./components/Patient/CreateMedicalRecord";
+import ViewMedicalRecord from "./components/Patient/ViewMedicalRecord";
+
+function MedicalRecordPage() {
+  const { id } = useParams();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  return (
+    <div className="h-full overflow-auto bg-white">
+      <ViewMedicalRecord
+        userId={user?.id}
+        recordId={id}
+        onBack={() => navigate(-1)}
+      />
+    </div>
+  );
+}
 
 function App() {
   const navigate = useNavigate();
@@ -57,10 +78,9 @@ function App() {
           <Route
             path="/medical-records/:id"
             element={
-              <CreateMedicalRecord
-                viewMode={true}
-                onBack={() => navigate(-1)}
-              />
+              <ProtectedRoute>
+                <MedicalRecordPage />
+              </ProtectedRoute>
             }
           />
           <Route path="*" element={<Navigate to="/" />} />
