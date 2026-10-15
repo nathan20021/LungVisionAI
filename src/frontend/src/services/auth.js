@@ -1,18 +1,17 @@
 import { UserManager, WebStorageStateStore } from "oidc-client-ts";
 import { getAuthConfig } from "./api";
 
-let userManagerPromise = null;
-// the SSO provider's Zitadel id, once the config has loaded; null without SSO
-let ssoProviderId = null;
+let settingsPromise = null;
 
 // Login runs against Zitadel (OIDC authorization code + PKCE). The Zitadel URL,
 // client id and scopes come from the backend, so the frontend build doesn't
 // need to know which Zitadel instance it talks to.
-export const getUserManager = () => {
-  if (!userManagerPromise) {
-    userManagerPromise = getAuthConfig().then((config) => {
-      ssoProviderId = config.sso_idp_id || null;
-      return new UserManager({
+// ssoScope, when an SSO provider is configured, makes Zitadel send the browser
+// straight to that provider instead of its own login page.
+export const getAuthSettings = () => {
+  if (!settingsPromise) {
+    settingsPromise = getAuthConfig().then((config) => ({
+      userManager: new UserManager({
         authority: config.authority,
         client_id: config.client_id,
         scope: config.scope,
@@ -21,17 +20,15 @@ export const getUserManager = () => {
         response_type: "code",
         automaticSilentRenew: true,
         userStore: new WebStorageStateStore({ store: window.localStorage }),
-      });
-    });
+      }),
+      ssoScope: config.sso_idp_id ? `urn:zitadel:iam:org:idp:id:${config.sso_idp_id}` : null,
+    }));
     // let the next caller retry if the backend was unreachable
-    userManagerPromise.catch(() => {
-      userManagerPromise = null;
+    settingsPromise.catch(() => {
+      settingsPromise = null;
     });
   }
-  return userManagerPromise;
+  return settingsPromise;
 };
 
-// Asking Zitadel for this scope sends the browser straight to the SSO provider
-// instead of Zitadel's own login page. Null until getUserManager has resolved.
-export const getSsoScope = () =>
-  ssoProviderId && `urn:zitadel:iam:org:idp:id:${ssoProviderId}`;
+export const getUserManager = () => getAuthSettings().then((settings) => settings.userManager);

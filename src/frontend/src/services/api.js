@@ -357,7 +357,13 @@ export const createRecordForUser = async (userId, record, token) => {
         impression: record.report.impression,
       },
       "treatmentPlan": record.treatmentPlan,
+      // created with the record in one transaction
+      "prescriptions": (record.prescriptions?.data || []).map((prescription) => ({
+        dosage: prescription.dosage || "",
+        dosageFrequency: prescription.dosageFrequency || "",
+        dosageDuration: prescription.dosageDuration || "",
+        time: prescription.time || "",
+      })),
     },
   );
-
 }

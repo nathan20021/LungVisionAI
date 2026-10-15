@@ -3,6 +3,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { FiAlertTriangle, FiCheck } from "react-icons/fi";
 import { FcGoogle } from "react-icons/fc";
 
+import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from "../components/Buttons";
 import { useAuth } from "../context/Authentication";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -26,12 +27,34 @@ const CASE_FINDING = {
 const MODES = ["Sign in", "Create account"];
 const SIGN_UP_STEPS = ["About you", "Your practice", "Password"];
 
-const PRIMARY_BUTTON =
-  "h-11 w-full rounded-lg bg-primary px-4 font-semibold text-white transition hover:bg-[#2c5465] active:scale-[0.97] disabled:opacity-60";
-const SECONDARY_BUTTON =
-  "h-11 w-full rounded-lg border border-gray-300 bg-white px-4 font-semibold text-gray-700 transition hover:bg-gray-50 active:scale-[0.97]";
+const PRIMARY_BUTTON = `${PRIMARY_BUTTON_CLASS} h-11 w-full`;
+const SECONDARY_BUTTON = `${SECONDARY_BUTTON_CLASS} h-11 w-full`;
 // Panes slide on a critically damped spring; reduced motion swaps instantly
 const SLIDE = "duration-[450ms] ease-spring motion-reduce:transition-none";
+
+// Starts a sign-in redirect. `pending` names what started it ("password",
+// "sso") until the redirect promise settles: on an error, or when the back
+// button restores this page from the browser's cache.
+const useSignIn = () => {
+  const { login } = useAuth();
+  const [pending, setPending] = useState(null);
+  const [error, setError] = useState("");
+
+  const signIn = async (method, loginHint) => {
+    setError("");
+    setPending(method);
+    try {
+      await login(loginHint, { sso: method === "sso" });
+    } catch (error) {
+      console.error("Login failed:", error);
+      setError("Sign-in could not start. Check your connection and try again.");
+    } finally {
+      setPending(null);
+    }
+  };
+
+  return { signIn, pending, error };
+};
 
 // Height of refs.current[index], kept current while it resizes
 const useHeightOf = (refs, index) => {
@@ -65,30 +88,14 @@ const Field = ({ label, ...input }) => {
 };
 
 function SignInPane({ email, setEmail }) {
-  const { login, ssoAvailable } = useAuth();
-  const [error, setError] = useState("");
-  // which button started the redirect: "password" or "sso"
-  const [redirecting, setRedirecting] = useState(null);
+  const { ssoAvailable } = useAuth();
+  const { signIn, pending, error } = useSignIn();
 
   // Password sign-in happens on the Zitadel login page, which the email
   // pre-fills; SSO goes straight to the SSO provider
-  const signIn = async (method) => {
-    setError("");
-    setRedirecting(method);
-    try {
-      await login(method === "sso" ? undefined : email.trim() || undefined, {
-        sso: method === "sso",
-      });
-    } catch (error) {
-      console.error("Login failed:", error);
-      setError("Sign-in could not start. Check your connection and try again.");
-      setRedirecting(null);
-    }
-  };
-
   const handleSubmit = (e) => {
     e.preventDefault();
-    signIn("password");
+    signIn("password", email.trim() || undefined);
   };
 
   return (
@@ -116,8 +123,8 @@ function SignInPane({ email, setEmail }) {
           {error}
         </p>
       )}
-      <button type="submit" disabled={!!redirecting} className={PRIMARY_BUTTON}>
-        {redirecting === "password" ? "Opening sign-in…" : "Continue"}
+      <button type="submit" disabled={!!pending} className={PRIMARY_BUTTON}>
+        {pending === "password" ? "Opening sign-in…" : "Continue"}
       </button>
       <p className="text-center text-[13px] text-gray-500">
         Next, you'll enter your password.
@@ -132,11 +139,11 @@ function SignInPane({ email, setEmail }) {
           <button
             type="button"
             onClick={() => signIn("sso")}
-            disabled={!!redirecting}
-            className={`${SECONDARY_BUTTON} inline-flex items-center justify-center gap-2.5 disabled:opacity-60`}
+            disabled={!!pending}
+            className={SECONDARY_BUTTON}
           >
             <FcGoogle className="h-5 w-5" aria-hidden="true" />
-            {redirecting === "sso" ? "Opening Google…" : "Sign in with Google"}
+            {pending === "sso" ? "Opening Google…" : "Sign in with Google"}
           </button>
         </>
       )}
@@ -145,7 +152,8 @@ function SignInPane({ email, setEmail }) {
 }
 
 function SignUpPane({ email, setEmail }) {
-  const { register, login } = useAuth();
+  const { register } = useAuth();
+  const signInAfter = useSignIn();
   // 0-2 are the form steps, 3 is the confirmation
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
@@ -178,6 +186,12 @@ function SignUpPane({ email, setEmail }) {
     if (!EMAIL_PATTERN.test(email.trim())) {
       goTo(0);
       setError("Enter a valid work email, like jane.doe@hospital.org.");
+      return;
+    }
+    // the backend needs both names; ask on the step that has them
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      goTo(0);
+      setError("Enter your first and last name.");
       return;
     }
     if (step < 2) return goTo(step + 1);
@@ -293,9 +307,9 @@ function SignUpPane({ email, setEmail }) {
         </div>
       </div>
 
-      {error && (
+      {(error || signInAfter.error) && (
         <p role="alert" className="text-sm text-error">
-          {error}
+          {error || signInAfter.error}
         </p>
       )}
 
@@ -311,8 +325,13 @@ function SignUpPane({ email, setEmail }) {
           </button>
         </div>
       ) : (
-        <button type="button" onClick={() => login(email.trim())} className={PRIMARY_BUTTON}>
-          Sign in
+        <button
+          type="button"
+          onClick={() => signInAfter.signIn("password", email.trim())}
+          disabled={!!signInAfter.pending}
+          className={PRIMARY_BUTTON}
+        >
+          {signInAfter.pending ? "Opening sign-in…" : "Sign in"}
         </button>
       )}
     </form>

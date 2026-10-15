@@ -156,6 +156,18 @@ test("a failed save keeps the edits and the id of rows already created", async (
   expect(createPrescription).toHaveBeenCalledTimes(1);
 });
 
+test("a record whose region names were corrected says so", async () => {
+  getMedicalRecord.mockResolvedValue({
+    ...record,
+    report: { ...record.report, regionNamesCorrected: true },
+  });
+  renderRecord();
+
+  expect(
+    await screen.findByText(/Region names on this record were corrected after it was saved/)
+  ).toBeInTheDocument();
+});
+
 test("view offers a retry when the record fails to load", async () => {
   getMedicalRecord.mockRejectedValueOnce(new Error("offline"));
   renderRecord();

@@ -5,9 +5,9 @@ import {
   getPredictionAndReport,
   getSegmentationBoxes,
   createRecordForUser,
-  createPrescription,
 } from "../../services/api";
 import { useAuth } from "../../context/Authentication";
+import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from "../Buttons";
 import { dicomToJpeg } from "../../services/dicom";
 import ViewMedicalRecord, {
   PrescriptionTable,
@@ -17,10 +17,6 @@ import ViewMedicalRecord, {
 
 const ACCEPTED_FILE = /\.(jpe?g|png|gif|dcm)$/i;
 
-const PRIMARY_BUTTON =
-  "inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md hover:bg-[#2c5465] active:scale-[0.97] transition font-medium disabled:opacity-60 disabled:active:scale-100";
-const SECONDARY_BUTTON =
-  "px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 active:scale-[0.97] transition font-medium";
 const INPUT =
   "w-full border border-gray-300 rounded-lg p-3 text-[15px] text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent";
 
@@ -280,8 +276,6 @@ function CreateMedicalRecord({ patient, onCancel, onCreated }) {
   const [formError, setFormError] = useState("");
   // the latest file choice; results for an earlier choice are dropped
   const selection = useRef(null);
-  // the stored record once created, so a retry never creates it twice
-  const saved = useRef(null);
 
   // Runs as soon as the upload finishes, while the clinician fills in the record
   const startAnalysis = (url, choice) => {
@@ -372,13 +366,30 @@ function CreateMedicalRecord({ patient, onCancel, onCreated }) {
   };
 
   const continueToReview = () => {
+    if (analysis?.status === "done") return goToReview();
+    // check now, not only when the results land
     if (!completePrescriptions(details.prescriptions)) {
       return setFormError("Each prescription needs a dosage.");
     }
     setFormError("");
-    if (analysis?.status === "done") return goToReview();
     if (analysis?.status === "error") retryAnalysis();
     setWaiting(true);
+  };
+
+  const hasInput =
+    xRay ||
+    details.note ||
+    details.treatmentPlan ||
+    details.prescriptions.length > 0 ||
+    details.priority !== "Low";
+  const cancel = () => {
+    if (
+      hasInput &&
+      !window.confirm("Discard this record? The X-ray and everything you entered will be lost.")
+    ) {
+      return;
+    }
+    onCancel();
   };
 
   // Continue was pressed early: step 2 opens by itself once the results land
@@ -401,37 +412,16 @@ function CreateMedicalRecord({ patient, onCancel, onCreated }) {
     setStep(1);
   };
 
+  // The record and its prescriptions are created in one request: all or nothing
   const saveRecord = async (record) => {
-    if (!saved.current) {
-      try {
-        saved.current = {
-          record: await createRecordForUser(patient.id, record, token),
-          unsavedPrescriptions: record.prescriptions.data,
-        };
-      } catch (error) {
-        console.error("Could not save the record:", error);
-        throw new Error(
-          "The record could not be saved. Check your connection and try again."
-        );
-      }
+    let created;
+    try {
+      created = await createRecordForUser(patient.id, record, token);
+    } catch (error) {
+      console.error("Could not save the record:", error);
+      throw new Error("The record could not be saved. Check your connection and try again.");
     }
-    // shortcut: once the record exists, a retry only resends the prescriptions that failed and drops later edits; update the stored record on retry if partial saves become common
-    const failed = [];
-    for (const row of saved.current.unsavedPrescriptions) {
-      try {
-        await createPrescription(patient.id, saved.current.record.id, row, token);
-      } catch (error) {
-        console.error("Could not save a prescription:", error);
-        failed.push(row);
-      }
-    }
-    saved.current.unsavedPrescriptions = failed;
-    if (failed.length) {
-      throw new Error(
-        "The record was saved, but some prescriptions were not. Save again to retry them."
-      );
-    }
-    onCreated(saved.current.record);
+    onCreated(created);
   };
 
   if (step === 2) {
@@ -568,7 +558,7 @@ function CreateMedicalRecord({ patient, onCancel, onCreated }) {
           </p>
         )}
         <div className="flex gap-3">
-          <button type="button" onClick={onCancel} className={SECONDARY_BUTTON}>
+          <button type="button" onClick={cancel} className={SECONDARY_BUTTON_CLASS}>
             Cancel
           </button>
           <button
@@ -576,7 +566,7 @@ function CreateMedicalRecord({ patient, onCancel, onCreated }) {
             onClick={continueToReview}
             disabled={xRay?.status !== "ready" || waiting}
             aria-busy={waiting}
-            className={PRIMARY_BUTTON}
+            className={PRIMARY_BUTTON_CLASS}
           >
             {waiting && <Spinner />}
             {waiting ? "Waiting for analysis…" : "Continue to analysis"}

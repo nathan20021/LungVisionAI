@@ -44,6 +44,19 @@ test("sign in passes the typed email on to the sign-in page", async () => {
   );
 });
 
+test("sign-in buttons come back once the redirect settles, e.g. after the back button", async () => {
+  let pageRestored;
+  mockAuth.login.mockReturnValue(new Promise((resolve) => (pageRestored = resolve)));
+  renderAt("/login");
+
+  fireEvent.click(pane("Sign in").getByText("Continue"));
+  expect(pane("Sign in").getByText("Opening sign-in…").closest("button")).toBeDisabled();
+  expect(pane("Sign in").getByText("Sign in with Google").closest("button")).toBeDisabled();
+
+  pageRestored();
+  expect(await pane("Sign in").findByText("Continue")).toBeEnabled();
+});
+
 test("Sign in with Google goes straight to the SSO provider", async () => {
   mockAuth.login.mockResolvedValue();
   renderAt("/login");
@@ -63,6 +76,9 @@ test("create account checks each step, registers, and shares the email with sign
   expect(signUp.getByRole("alert")).toHaveTextContent("Enter a valid work email");
 
   fireEvent.change(signUp.getByLabelText("Work email"), { target: { value: "jane@hospital.org" } });
+  fireEvent.click(signUp.getByText("Continue"));
+  expect(signUp.getByRole("alert")).toHaveTextContent("Enter your first and last name.");
+
   fireEvent.change(signUp.getByLabelText("First name"), { target: { value: "Jane" } });
   fireEvent.change(signUp.getByLabelText("Last name"), { target: { value: "Doe" } });
   fireEvent.click(signUp.getByText("Continue"));

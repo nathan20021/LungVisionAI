@@ -86,10 +86,9 @@ test("the analysis starts on upload, and an early Continue waits for it", async 
   expect(screen.getByText("1 of 1 regions flagged")).toBeInTheDocument();
 });
 
-test("saving creates the record, then its prescriptions", async () => {
+test("saving creates the record and its prescriptions in one request", async () => {
   getPredictionAndReport.mockResolvedValue(prediction);
   createRecordForUser.mockResolvedValue({ id: "rec-1" });
-  createPrescription.mockResolvedValue({ id: "rx-1" });
   const onCreated = jest.fn();
   renderFlow(onCreated);
 
@@ -108,15 +107,47 @@ test("saving creates the record, then its prescriptions", async () => {
     expect.objectContaining({
       xRayUrl: XRAY_URL,
       report: expect.objectContaining({ impression: "Right lower zone consolidation" }),
+      prescriptions: { data: [expect.objectContaining({ dosage: "Amoxicillin 1 g" })] },
     }),
     "token"
   );
-  expect(createPrescription).toHaveBeenCalledWith(
-    "p1",
-    "rec-1",
-    expect.objectContaining({ dosage: "Amoxicillin 1 g" }),
-    "token"
-  );
+  expect(createPrescription).not.toHaveBeenCalled();
+});
+
+test("a failed save stays on the review, and Back is locked while saving", async () => {
+  getPredictionAndReport.mockResolvedValue(prediction);
+  let failSave;
+  createRecordForUser.mockReturnValue(new Promise((_, reject) => (failSave = reject)));
+  const onCreated = jest.fn();
+  renderFlow(onCreated);
+
+  uploadXRay();
+  await screen.findByText("Ready to review");
+  fireEvent.click(screen.getByText("Continue to analysis"));
+  fireEvent.click(await screen.findByText("Save record"));
+  expect(screen.getByLabelText("Back to record details")).toBeDisabled();
+
+  await act(async () => failSave(new Error("offline")));
+
+  expect(screen.getByRole("alert")).toHaveTextContent("The record could not be saved");
+  expect(screen.getByLabelText("Back to record details")).toBeEnabled();
+  expect(onCreated).not.toHaveBeenCalled();
+});
+
+test("Cancel asks before discarding what was entered", () => {
+  const onCancel = jest.fn();
+  render(<CreateMedicalRecord patient={{ id: "p1" }} onCancel={onCancel} onCreated={() => {}} />);
+  const confirm = jest.spyOn(window, "confirm").mockReturnValue(false);
+
+  fireEvent.click(screen.getByText("Cancel"));
+  expect(confirm).not.toHaveBeenCalled();
+  expect(onCancel).toHaveBeenCalledTimes(1);
+
+  fireEvent.change(screen.getByLabelText("Clinical notes"), { target: { value: "Cough" } });
+  fireEvent.click(screen.getByText("Cancel"));
+  expect(confirm).toHaveBeenCalled();
+  expect(onCancel).toHaveBeenCalledTimes(1);
+  confirm.mockRestore();
 });
 
 test("a failed analysis can be retried from step 1", async () => {

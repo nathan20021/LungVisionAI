@@ -1,6 +1,6 @@
 import { createContext, useState, useEffect, useContext, useCallback } from "react";
 import { signUp, getSelfUser } from "../services/api";
-import { getUserManager, getSsoScope } from "../services/auth";
+import { getAuthSettings, getUserManager } from "../services/auth";
 import { useNavigate } from "react-router-dom";
 
 export const AuthContext = createContext(null);
@@ -20,6 +20,17 @@ export const AuthProvider = ({ children }) => {
   // whether an SSO provider is configured, known once the OIDC config loads
   const [ssoAvailable, setSsoAvailable] = useState(false);
   const navigate = useNavigate();
+
+  // Every load of the OIDC settings refreshes ssoAvailable, so a later
+  // successful load fixes a failed first one
+  const loadSettings = useCallback(
+    () =>
+      getAuthSettings().then((settings) => {
+        setSsoAvailable(!!settings.ssoScope);
+        return settings;
+      }),
+    []
+  );
 
   // Load the app profile for a signed-in user. The backend grants first-time
   // SSO users their default role; refresh the token so it carries the new scopes.
@@ -43,10 +54,9 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
     };
 
-    getUserManager()
-      .then(async (manager) => {
-        userManager = manager;
-        setSsoAvailable(!!getSsoScope());
+    loadSettings()
+      .then(async (settings) => {
+        userManager = settings.userManager;
         userManager.events.addUserLoaded(onUserLoaded);
         userManager.events.addUserUnloaded(onUserUnloaded);
 
@@ -69,15 +79,15 @@ export const AuthProvider = ({ children }) => {
         userManager.events.removeUserUnloaded(onUserUnloaded);
       }
     };
-  }, [loadSession]);
+  }, [loadSession, loadSettings]);
 
   // Sends the browser to the Zitadel login page (password or SSO), or with
   // sso straight to the SSO provider
   const login = async (loginHint, { sso = false } = {}) => {
-    const userManager = await getUserManager();
+    const { userManager, ssoScope } = await loadSettings();
     await userManager.signinRedirect({
       ...(loginHint && { login_hint: loginHint }),
-      ...(sso && { scope: `${userManager.settings.scope} ${getSsoScope()}` }),
+      ...(sso && { scope: `${userManager.settings.scope} ${ssoScope}` }),
     });
   };
 

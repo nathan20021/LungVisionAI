@@ -3,6 +3,7 @@ import { FiPlus } from "react-icons/fi";
 import CreateMedicalRecord from "./CreateMedicalRecord";
 import ViewMedicalRecord from "./ViewMedicalRecord";
 import PatientOverview from "./PatientOverview";
+import { PRIMARY_BUTTON_CLASS } from "../Buttons";
 import {
   getMedicalRecordsForPatient,
   parseRecordData,
@@ -77,7 +78,7 @@ function PatientMedicalRecords({ patient }) {
             <div className="flex gap-4">
               <button
                 onClick={() => setIsCreating(true)}
-                className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-md hover:bg-[#2c5465] transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none"
+                className={PRIMARY_BUTTON_CLASS}
               >
                 <FiPlus className="text-lg" />
                 <span>Create New Record</span>

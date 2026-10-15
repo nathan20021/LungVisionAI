@@ -16,6 +16,7 @@ import {
 } from "../../services/api";
 import { useAuth } from "../../context/Authentication";
 import XrayWithSegmentationBoxes from "./XrayWithSegmentationBoxes";
+import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from "../Buttons";
 
 const PRIORITY_STYLES = {
   High: { pill: "bg-red-50 text-red-700", dot: "bg-red-600" },
@@ -102,12 +103,13 @@ export const TextSection = ({ title, text, emptyText, onChange }) => (
   </div>
 );
 
-const BackButton = ({ onClick, label = "Back to records" }) => (
+const BackButton = ({ onClick, label = "Back to records", disabled = false }) => (
   <button
     type="button"
     onClick={onClick}
     aria-label={label}
-    className="w-10 h-10 shrink-0 rounded-lg border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-50 active:scale-95 transition"
+    disabled={disabled}
+    className="w-10 h-10 shrink-0 rounded-lg border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-50 active:scale-95 transition disabled:opacity-50"
   >
     <FiChevronLeft className="w-5 h-5" />
   </button>
@@ -228,7 +230,7 @@ function ViewMedicalRecord({ userId, recordId, onBack, newRecord, onSave }) {
           <button
             type="button"
             onClick={loadRecord}
-            className="mt-5 px-4 py-2 bg-primary text-white rounded-md hover:bg-[#2c5465] active:scale-[0.97] transition font-medium"
+            className={`mt-5 ${PRIMARY_BUTTON_CLASS}`}
           >
             Try again
           </button>
@@ -441,6 +443,8 @@ function ViewMedicalRecord({ userId, recordId, onBack, newRecord, onSave }) {
           <BackButton
             onClick={goBack}
             label={newRecord ? "Back to record details" : undefined}
+            // leaving mid-save could start a second save of the same record
+            disabled={saving}
           />
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
@@ -481,7 +485,7 @@ function ViewMedicalRecord({ userId, recordId, onBack, newRecord, onSave }) {
                 type="button"
                 onClick={cancelEditing}
                 disabled={saving}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 active:scale-[0.97] transition font-medium disabled:opacity-50"
+                className={SECONDARY_BUTTON_CLASS}
               >
                 Cancel
               </button>
@@ -489,7 +493,7 @@ function ViewMedicalRecord({ userId, recordId, onBack, newRecord, onSave }) {
                 type="button"
                 onClick={saveChanges}
                 disabled={saving}
-                className="px-4 py-2 bg-primary text-white rounded-md hover:bg-[#2c5465] active:scale-[0.97] transition font-medium disabled:opacity-60"
+                className={PRIMARY_BUTTON_CLASS}
               >
                 {saving ? "Saving…" : newRecord ? "Done" : "Save changes"}
               </button>
@@ -506,7 +510,7 @@ function ViewMedicalRecord({ userId, recordId, onBack, newRecord, onSave }) {
                 type="button"
                 onClick={startEditing}
                 disabled={saving}
-                className="disabled:opacity-50 inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 active:scale-[0.97] transition font-medium"
+                className={SECONDARY_BUTTON_CLASS}
               >
                 <FiEdit2 className="w-4 h-4" />
                 Edit record
@@ -516,7 +520,7 @@ function ViewMedicalRecord({ userId, recordId, onBack, newRecord, onSave }) {
                   type="button"
                   onClick={saveNewRecord}
                   disabled={saving}
-                  className="px-4 py-2 bg-primary text-white rounded-md hover:bg-[#2c5465] active:scale-[0.97] transition font-medium disabled:opacity-60"
+                  className={PRIMARY_BUTTON_CLASS}
                 >
                   {saving ? "Saving…" : "Save record"}
                 </button>
@@ -696,6 +700,17 @@ function ViewMedicalRecord({ userId, recordId, onBack, newRecord, onSave }) {
                 />
                 AI-generated report. Review against the image before acting on
                 it.
+              </p>
+            )}
+            {report.regionNamesCorrected && (
+              <p className="mt-2 flex items-start gap-2 rounded-lg bg-orange-50 px-3 py-2.5 text-[13px] font-medium text-orange-800">
+                <FiAlertTriangle
+                  className="w-4 h-4 mt-px shrink-0 text-orange-600"
+                  aria-hidden="true"
+                />
+                Region names on this record were corrected after it was saved.
+                The impression and findings may still use the old names, and
+                the right upper lung zone scores are not reliable.
               </p>
             )}
           </section>
