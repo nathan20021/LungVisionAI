@@ -186,14 +186,16 @@ class Detr(pl.LightningModule):
 
         final_last_hidden_states = torch.zeros((12, 256), dtype=torch.float32)
 
-        for i in range(1,len(set(labels))):
+        # row i-1 holds the highest-scoring query labelled as region class i (1-12).
+        # There is no score threshold (get_boxes uses 0.5), so nearly every region
+        # gets a row; one that no query was labelled as keeps its zero row
+        for i in range(1, 13):
             positions = np.where(labels == i)[0]
             if len(positions) == 0:
-                final_last_hidden_states[i] = 0
-            else:
-                _scores = scores[positions]
-                _argmax = np.argmax(_scores)
-                max_score_index = positions[_argmax]
-                final_last_hidden_states[i-1] = last_hidden_states[max_score_index]
+                continue
+            _scores = scores[positions]
+            _argmax = np.argmax(_scores)
+            max_score_index = positions[_argmax]
+            final_last_hidden_states[i-1] = last_hidden_states[max_score_index]
 
         return final_last_hidden_states

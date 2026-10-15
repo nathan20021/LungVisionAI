@@ -19,6 +19,7 @@ IdentityProvider = ZitadelIdentityProvider(
     client_id=RuntimeConfig.get("ZITADEL_CLIENT_ID"),
     service_token=RuntimeConfig.get("ZITADEL_SERVICE_USER_TOKEN"),
     sso_default_role=RuntimeConfig.get("ZITADEL_SSO_DEFAULT_ROLE"),
+    sso_idp_id=RuntimeConfig.get("ZITADEL_SSO_IDP_ID"),
 )
 
 # app.py opens the pool, so importing runtime needs no database

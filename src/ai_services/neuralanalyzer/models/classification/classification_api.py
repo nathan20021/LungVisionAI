@@ -3,7 +3,7 @@ import torch
 
 from collections import defaultdict
 from .transfomer import TransformerNetwork
-from ..Detr.detr_api import get_features
+from ..Detr.detr_api import get_features, anatomical_regions
 
 # Constants
 MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model.ckpt")
@@ -18,21 +18,6 @@ diseases = [
     'consolidation',
     'fluid overload/heart failure',
     'pneumonia'
-]
-
-anatomical_regions = [
-    'right upper lung zone',
-    'right mid lung zone',
-    'right lower lung zone',
-    'right costophrenic angle',
-    'right hilar structures',
-    'right apical zone',
-    'left upper lung zone',
-    'left mid lung zone',
-    'left lower lung zone',
-    'left costophrenic angle',
-    'left hilar structures',
-    'cardiac silhouette',
 ]
 
 # Check Device

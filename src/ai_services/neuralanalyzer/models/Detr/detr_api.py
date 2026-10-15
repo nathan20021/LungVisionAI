@@ -9,20 +9,24 @@ from collections import defaultdict
 # Constants
 MODEL_PATH = os.environ.get("MODEL_PATH", "/models/detr.ckpt")
 
+# DETR class id k (1-12) is region k-1 below. The detector was trained with the
+# region names in alphabetical order, so this list must stay alphabetical; the
+# classifier's output rows follow the same order.
 anatomical_regions = [
-    'right upper lung zone',
-    'right mid lung zone',
-    'right lower lung zone',
-    'right costophrenic angle',
-    'right hilar structures',
-    'right apical zone',
-    'left upper lung zone',
-    'left mid lung zone',
-    'left lower lung zone',
+    'cardiac silhouette',
     'left costophrenic angle',
     'left hilar structures',
-    'cardiac silhouette',
+    'left lower lung zone',
+    'left mid lung zone',
+    'left upper lung zone',
+    'right apical zone',
+    'right costophrenic angle',
+    'right hilar structures',
+    'right lower lung zone',
+    'right mid lung zone',
+    'right upper lung zone',
 ]
+assert anatomical_regions == sorted(anatomical_regions)
 
 color_dict = {
     1: "red", 2: "green", 3: "purple", 4: "orange",

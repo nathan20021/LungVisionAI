@@ -21,7 +21,7 @@ The browser must reach ports **3000, 5001, 8080 and 5556** on `localhost`. On a 
 ### Test accounts
 
 - **Doctor (password):** register at http://localhost:3000/register, then sign in.
-- **Doctor (SSO):** click *Sign In*, then *Hospital SSO (dev)*, then type any username on the mock's page (e.g. `dr.sso`). The first SSO sign-in creates the Zitadel user, and the backend grants the doctor scopes.
+- **Doctor (SSO):** click *Sign in with Google* on the app's sign-in page; it goes straight to the configured SSO provider, which locally is the mock. Type any username on the mock's page (e.g. `dr.sso`). The first SSO sign-in creates the Zitadel user, and the backend grants the doctor scopes.
 - **Patient:** doctors create patients from the patient list. Patients get no password, so they cannot sign in until one is set (Zitadel console, *Users*).
 
 ### Resetting

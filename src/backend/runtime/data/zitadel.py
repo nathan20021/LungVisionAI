@@ -53,12 +53,15 @@ class ZitadelIdentityProvider:
         client_id,
         service_token,
         sso_default_role="doctor",
+        sso_idp_id=None,
     ):
         self.issuer = issuer.rstrip("/")
         self.api_url = (api_url or issuer).rstrip("/")
         self.organization_id = organization_id
         self.project_id = project_id
         self.client_id = client_id
+        # the SSO identity provider's Zitadel id, None when SSO is not configured
+        self.sso_idp_id = sso_idp_id or None
         if sso_default_role not in SSO_DEFAULT_ROLES:
             raise ValueError(
                 f"ZITADEL_SSO_DEFAULT_ROLE must be one of {', '.join(SSO_DEFAULT_ROLES)}"

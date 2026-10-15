@@ -3,6 +3,7 @@ import { FiFileText, FiPlus } from "react-icons/fi";
 import { getMedicalRecord } from "../../services/api";
 import { useAuth } from "../../context/Authentication";
 import { formatDate, TextSection } from "./ViewMedicalRecord";
+import { PRIMARY_BUTTON_CLASS } from "../Buttons";
 
 // records: the patient's record list, null while it loads
 function PatientOverview({ patient, records, onCreate, onView }) {
@@ -40,7 +41,7 @@ function PatientOverview({ patient, records, onCreate, onView }) {
         <button
           type="button"
           onClick={onCreate}
-          className="mt-6 inline-flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-md hover:bg-[#2c5465] active:scale-[0.97] transition font-medium"
+          className={`mt-6 ${PRIMARY_BUTTON_CLASS}`}
         >
           <FiPlus className="text-lg" />
           Create first record

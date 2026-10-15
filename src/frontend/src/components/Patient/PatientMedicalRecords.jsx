@@ -1,232 +1,28 @@
 import React, { useState, useEffect } from "react";
-import {
-  FiPlus,
-  FiUpload,
-  FiZoomIn,
-  FiZoomOut,
-  FiRotateCw,
-} from "react-icons/fi";
+import { FiPlus } from "react-icons/fi";
 import CreateMedicalRecord from "./CreateMedicalRecord";
 import ViewMedicalRecord from "./ViewMedicalRecord";
 import PatientOverview from "./PatientOverview";
+import { PRIMARY_BUTTON_CLASS } from "../Buttons";
 import {
   getMedicalRecordsForPatient,
-  getPredictionAndReport,
-  getSegmentationBoxes,
-  createRecordForUser,
   parseRecordData,
 } from "../../services/api";
 import { useAuth } from "../../context/Authentication";
-import XrayWithSegmentationBoxes from "./XrayWithSegmentationBoxes";
-
-const AnalysisLoader = () => (
-  <div className="fixed inset-0 bg-white/95 backdrop-filter backdrop-blur-md z-9999 flex flex-col items-center justify-center">
-    <div className="text-center p-8 rounded-xl shadow-xl bg-white max-w-lg border border-gray-100 translate-y-full">
-      <div className="mb-6">
-        <svg
-          className="w-24 h-24 mx-auto text-primary"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="xMidYMid"
-        >
-          <circle
-            cx="50"
-            cy="50"
-            r="35"
-            stroke="#3C7187"
-            strokeWidth="5"
-            strokeDasharray="55 55"
-            fill="none"
-            strokeLinecap="round"
-          >
-            <animateTransform
-              attributeName="transform"
-              type="rotate"
-              repeatCount="indefinite"
-              dur="1.5s"
-              values="0 50 50;360 50 50"
-              keyTimes="0;1"
-            ></animateTransform>
-          </circle>
-          <circle
-            cx="50"
-            cy="50"
-            r="25"
-            stroke="#2c5465"
-            strokeWidth="5"
-            strokeDasharray="40 40"
-            fill="none"
-            strokeLinecap="round"
-          >
-            <animateTransform
-              attributeName="transform"
-              type="rotate"
-              repeatCount="indefinite"
-              dur="1s"
-              values="360 50 50;0 50 50"
-              keyTimes="0;1"
-            ></animateTransform>
-          </circle>
-        </svg>
-      </div>
-      <h2 className="text-2xl font-bold text-primary mb-4 animate-pulse">
-        Analyzing X-Ray
-      </h2>
-      <p className="text-gray-600 max-w-sm mx-auto mb-10">
-        AI is processing your medical data and generating a comprehensive
-        analysis with region-specific findings
-      </p>
-      <div className="w-full h-2 bg-gray-200 rounded-full mx-auto overflow-hidden">
-        <div className="h-full bg-primary animate-progress rounded-full"></div>
-      </div>
-      <div className="mt-6 flex justify-center gap-2">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div
-            key={i}
-            className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce opacity-80"
-            style={{ animationDelay: `${i * 0.15}s` }}
-          ></div>
-        ))}
-      </div>
-    </div>
-  </div>
-);
 
 function PatientMedicalRecords({ patient }) {
-  const { token, user } = useAuth();
+  const { token } = useAuth();
   const [isCreating, setIsCreating] = useState(false);
   const [viewingRecord, setViewingRecord] = useState(null);
   // null until the first load finishes
   const [medicalRecords, setMedicalRecords] = useState(null);
   const [recordsError, setRecordsError] = useState(false);
-  const [showAnalysis, setShowAnalysis] = useState(false);
-  const [selectedRegion, setSelectedRegion] = useState("cardiac silhouette");
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [recordData, setRecordData] = useState({
-    priority: "Low",
-    treatmentPlan: "",
-    note: "",
-    file: null,
-    xRayUrl: "",
-  });
-  const [isEditing, setIsEditing] = useState(false);
-  const [prediction, setPrediction] = useState({
-    findings: "",
-    impression: "",
-    predictions: [],
-    segmentationBoxes: [],
-  });
-
-  const getSelectedConditions = (selectedRegion) => {
-    const selectedPrediction = prediction?.predictions?.find(
-      (prediction) => prediction.region === selectedRegion
-    );
-    return selectedPrediction?.conditions || [];
-  };
 
   useEffect(() => {
     getMedicalRecordsForPatient(patient.id, token)
       .then((data) => setMedicalRecords(data))
       .catch(() => setRecordsError(true));
   }, [patient.id, token]);
-
-  const resetAllStates = () => {
-    setIsCreating(false);
-    setViewingRecord(null);
-    setShowAnalysis(false);
-    setSelectedRegion("cardiac silhouette");
-    setRecordData({
-      priority: "Low",
-      treatmentPlan: "",
-      note: "",
-      file: null,
-      xRayUrl: "",
-    });
-    setPrediction({
-      findings: "",
-      impression: "",
-      predictions: [],
-      segmentationBoxes: [],
-    });
-  };
-
-  const handleAnalyzeClick = async (formData) => {
-    setRecordData({
-      ...formData,
-    });
-    setIsTransitioning(true);
-    setIsAnalyzing(true);
-    const [predictionData, segmentationBoxData] = await Promise.all([
-      getPredictionAndReport(patient.id, formData.xRayUrl, token),
-      getSegmentationBoxes(user?.id, formData.xRayUrl, token),
-    ]);
-
-    // console.log("predictionData", predictionData);
-    // console.log("segmentationBoxData", segmentationBoxData);
-
-    setPrediction({
-      ...prediction,
-      findings: predictionData.report.findings,
-      impression: predictionData.report.impression,
-      predictions: predictionData.predictions,
-      segmentationBoxes: segmentationBoxData,
-    });
-
-    setShowAnalysis(true);
-    setIsTransitioning(false);
-    setIsAnalyzing(false);
-  };
-
-  const submitRecord = async () => {
-    const recordWithPrediction = {
-      xRayUrl: recordData.xRayUrl,
-      note: recordData.note,
-      priority: recordData.priority,
-      treatmentPlan: recordData.treatmentPlan,
-      report: {
-        findings: prediction.findings,
-        impression: prediction.impression,
-        segmentationBoxes: prediction.segmentationBoxes,
-        predictions: prediction.predictions,
-      },
-    };
-
-    const newRecord = await createRecordForUser(
-      patient.id,
-      recordWithPrediction,
-      token
-    );
-    setMedicalRecords((prevRecords) => [
-      ...prevRecords,
-      parseRecordData(newRecord),
-    ]);
-    setIsCreating(false);
-    setIsTransitioning(false);
-    setShowAnalysis(false);
-  };
-
-  const getColorForConfidence = (confidence) => {
-    const h = 100 - confidence;
-    if (h > 50) {
-      return `rgb(${Math.floor(255 * (1 - (h - 50) / 50.0))}, 255, 0)`;
-    } else {
-      return `rgb(255, ${Math.floor(255 * (h / 50.0))}, 0)`;
-    }
-  };
-  
-  const onSelectLabel = (label) => {
-    setSelectedRegion(label);
-  };
-
-  const handleBackToRecord = () => {
-    setIsTransitioning(true);
-    setShowAnalysis(false);
-    setIsTransitioning(false);
-  };
-
-  if (isAnalyzing) {
-    return <AnalysisLoader />;
-  }
 
   if (viewingRecord) {
     return (
@@ -238,268 +34,19 @@ function PatientMedicalRecords({ patient }) {
     );
   }
 
-  // If creating a new record
   if (isCreating) {
     return (
-      <div
-        className={`transition-opacity duration-300 ${
-          isTransitioning ? "opacity-0" : "opacity-100"
-        }`}
-      >
-        {showAnalysis ? (
-          // Analysis Stage
-          <div className="p-6 space-y-6">
-            {/* Header */}
-            {/* Steps Indicator */}
-            <div className="flex items-center max-w-2xl mx-auto">
-              <div
-                className="flex-1 flex items-center opacity-50 cursor-pointer"
-                onClick={handleBackToRecord}
-              >
-                <div className="flex-none">
-                  <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-medium text-lg">
-                    1
-                  </div>
-                </div>
-                <div className="flex-1 h-1 bg-primary"></div>
-              </div>
-              <div className="flex-1 flex items-center">
-                <div className="flex-1 h-1 bg-primary"></div>
-                <div className="flex-none">
-                  <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-medium text-lg">
-                    2
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="flex max-w-2xl mx-auto mt-2">
-              <div
-                className="flex-1 text-center opacity-50 cursor-pointer hover:opacity-75 transition-opacity"
-                onClick={handleBackToRecord}
-              >
-                <p className="font-medium text-primary">Record Details</p>
-                <p className="text-sm text-gray-500">
-                  Enter medical information
-                </p>
-              </div>
-              <div className="flex-1 text-center">
-                <p className="font-medium text-primary">AI Analysis</p>
-                <p className="text-sm text-gray-500">Review AI findings</p>
-              </div>
-            </div>
-
-            {/* Rest of the analysis content */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Main Analysis Area */}
-              <div className="lg:col-span-7 space-y-6">
-                {/* Image Display Area */}
-                <div className="relative rounded-lg overflow-hidden bg-gray-900 aspect-square w-3/5 mx-auto">
-                  {recordData?.file || recordData.xRayUrl ? (
-                    // TODO
-                    <div className="relative">
-                      <XrayWithSegmentationBoxes
-                        src={recordData.xRayUrl}
-                        boundingBoxes={prediction.segmentationBoxes || []}
-                        onSelectLabel={onSelectLabel}
-                        selectedLabel={selectedRegion}
-                      />
-                    </div>
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-white">
-                      <div className="text-center">
-                        <FiUpload className="w-8 h-8 mx-auto mb-2" />
-                        <p>No image uploaded</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Image Controls */}
-                  <div className="absolute top-4 right-4 flex gap-2">
-                    <button className="p-2 bg-black/30 backdrop-blur-xs rounded-full hover:bg-black/40 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none">
-                      <FiZoomIn className="w-5 h-5 text-white" />
-                    </button>
-                    <button className="p-2 bg-black/30 backdrop-blur-xs rounded-full hover:bg-black/40 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none">
-                      <FiZoomOut className="w-5 h-5 text-white" />
-                    </button>
-                    <button className="p-2 bg-black/30 backdrop-blur-xs rounded-full hover:bg-black/40 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none">
-                      <FiRotateCw className="w-5 h-5 text-white" />
-                    </button>
-                  </div>
-                </div>
-                <div className="w-full">
-                  <div className="grid grid-cols-3 gap-2">
-                    {prediction?.predictions.map((pred) => (
-                      <button
-                        key={pred.region}
-                        className={`flex items-center gap-3 justify-start px-3 py-2 border rounded-md text-sm transition-colors ${
-                          selectedRegion === pred.region
-                            ? "bg-[#9a9a9a] text-white"
-                            : "bg-gray-50 text-gray-700 hover:bg-gray-50"
-                        }`}
-                        onClick={() => setSelectedRegion(pred.region)}
-                      >
-                        <div
-                          className="flex-0 w-3 h-3 rounded-full"
-                          style={{
-                            backgroundColor: getColorForConfidence(
-                              pred.conditions[0].confidence
-                            ),
-                          }}
-                        />
-
-                        <p className="flex-1">{pred.region}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Analysis Results Panel */}
-              <div className="lg:col-span-5 bg-white rounded-lg border border-gray-200">
-                <div className="p-6 space-y-6">
-                  {/* Detection Results */}
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-medium text-gray-900">
-                        Selected Region
-                      </h3>
-                      <button
-                        onClick={() => setIsEditing(!isEditing)}
-                        className="text-sm text-primary hover:text-[#2c5465] px-3 py-1 rounded-md hover:bg-gray-50 transition-all duration-200 hover:shadow-xs hover:-translate-y-0.5 active:translate-y-0 active:shadow-none"
-                      >
-                        {isEditing ? "Save" : "Edit"}
-                      </button>
-                    </div>
-
-                    <div className="space-y-4">
-                      {/* Primary Finding */}
-                      <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
-                        <div>
-                          <h4 className="font-medium text-blue-900">
-                            <h1>{selectedRegion.toUpperCase()}</h1>
-                          </h4>
-                        </div>
-                      </div>
-                      {/* Region Analysis */}
-                      <div className="space-y-3">
-                        {/* Region-specific Detection Results */}
-                        <h4 className="font-medium text-gray-700">
-                          Findings & Confidence
-                        </h4>
-                        {selectedRegion && (
-                          <div className="space-y-3">
-                            <div className="space-y-2">
-                              {getSelectedConditions(selectedRegion)
-                                .slice(0, 5)
-                                .map((finding, index) => (
-                                  <div
-                                    key={index}
-                                    className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-100"
-                                  >
-                                    <span className="text-sm text-gray-700 font-medium">
-                                      {finding.condition}
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                        <div
-                                          className="h-full bg-primary rounded-full"
-                                          style={{
-                                            width: `${finding.confidence}%`,
-                                          }}
-                                        />
-                                      </div>
-                                      <span className="text-sm text-gray-500 min-w-[3ch]">
-                                        {Number(finding.confidence).toFixed(2)}%
-                                      </span>
-                                    </div>
-                                  </div>
-                                ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Findings */}
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      Findings
-                    </h3>
-                    {isEditing ? (
-                      <textarea
-                        className="w-full border border-gray-200 rounded-lg p-4 min-h-[120px] text-sm text-gray-700 focus:ring-2 focus:ring-[#3C7187] focus:border-transparent"
-                        value={prediction.findings}
-                        onChange={(e) =>
-                          setPrediction({
-                            ...prediction,
-                            findings: e.target.value,
-                          })
-                        }
-                      />
-                    ) : (
-                      <div className="w-full border border-gray-200 rounded-lg p-4 min-h-[120px] text-sm text-gray-700 whitespace-pre-line">
-                        {prediction.findings}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Impression */}
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      Impression
-                    </h3>
-                    {isEditing ? (
-                      <textarea
-                        className="w-full border border-gray-200 rounded-lg p-4 min-h-[100px] text-sm text-gray-700 focus:ring-2 focus:ring-[#3C7187] focus:border-transparent"
-                        value={prediction.impression}
-                        onChange={(e) =>
-                          setPrediction({
-                            ...prediction,
-                            impression: e.target.value,
-                          })
-                        }
-                      />
-                    ) : (
-                      <div className="w-full border border-gray-200 rounded-lg p-4 min-h-[100px] text-sm text-gray-700 whitespace-pre-line">
-                        {prediction.impression}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Analysis Actions - Moved to bottom */}
-            <div className="mt-8 flex justify-end gap-4 px-6">
-              <button
-                onClick={resetAllStates}
-                className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={submitRecord}
-                className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none font-medium"
-              >
-                Approval
-              </button>
-              <button
-                onClick={submitRecord}
-                className="px-6 py-2.5 bg-primary text-white rounded-md hover:bg-primary/90 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none font-medium"
-              >
-                Submit Analysis
-              </button>
-            </div>
-          </div>
-        ) : (
-          // Medical Record Creation Stage
-          <CreateMedicalRecord
-            onBack={resetAllStates}
-            onAnalyze={handleAnalyzeClick}
-          />
-        )}
-      </div>
+      <CreateMedicalRecord
+        patient={patient}
+        onCancel={() => setIsCreating(false)}
+        onCreated={(record) => {
+          setMedicalRecords((prevRecords) => [
+            ...prevRecords,
+            parseRecordData(record),
+          ]);
+          setIsCreating(false);
+        }}
+      />
     );
   }
 
@@ -531,7 +78,7 @@ function PatientMedicalRecords({ patient }) {
             <div className="flex gap-4">
               <button
                 onClick={() => setIsCreating(true)}
-                className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-md hover:bg-[#2c5465] transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none"
+                className={PRIMARY_BUTTON_CLASS}
               >
                 <FiPlus className="text-lg" />
                 <span>Create New Record</span>
@@ -650,65 +197,6 @@ function PatientMedicalRecords({ patient }) {
           </div>
         </section>
       )}
-
-      <style>
-        {`
-          @keyframes slideIn {
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-
-          @keyframes scaleIn {
-            to {
-              transform: scaleX(1);
-            }
-          }
-
-          @keyframes progress {
-            0% {
-              width: 5%;
-            }
-            50% {
-              width: 70%;
-            }
-            100% {
-              width: 95%;
-            }
-          }
-          
-          .animate-progress {
-            animation: progress 2s ease-in-out infinite;
-          }
-          
-          @keyframes pulse {
-            0%, 100% {
-              opacity: 1;
-            }
-            50% {
-              opacity: 0.7;
-            }
-          }
-          
-          .animate-pulse {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-          }
-          
-          @keyframes bounce {
-            0%, 100% {
-              transform: translateY(0);
-            }
-            50% {
-              transform: translateY(-5px);
-            }
-          }
-          
-          .animate-bounce {
-            animation: bounce 1s ease-in-out infinite;
-          }
-        `}
-      </style>
     </div>
   );
 }

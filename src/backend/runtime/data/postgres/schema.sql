@@ -30,3 +30,9 @@ CREATE TABLE IF NOT EXISTS medical_prescriptions (
 
 CREATE INDEX IF NOT EXISTS medical_prescriptions_record_id_idx
     ON medical_prescriptions (record_id, created_at DESC, id DESC);
+
+-- One-time data fixes that already ran (see medical_record_service.py)
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    name TEXT PRIMARY KEY,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

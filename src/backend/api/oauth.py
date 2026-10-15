@@ -28,6 +28,8 @@ def get_auth_config():
                         f"urn:zitadel:iam:org:project:id:{IdentityProvider.project_id}:aud",
                     ]
                 ),
+                # the SSO provider's Zitadel id, null when SSO is not configured
+                "sso_idp_id": IdentityProvider.sso_idp_id,
             }
         ),
         200,

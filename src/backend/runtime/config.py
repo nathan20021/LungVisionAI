@@ -38,6 +38,8 @@ class Config:
             "ZITADEL_PROJECT_ID": _zitadel_setting("ZITADEL_PROJECT_ID"),
             "ZITADEL_CLIENT_ID": _zitadel_setting("ZITADEL_CLIENT_ID"),
             "ZITADEL_SERVICE_USER_TOKEN": _zitadel_setting("ZITADEL_SERVICE_USER_TOKEN"),
+            # empty when no SSO provider is configured
+            "ZITADEL_SSO_IDP_ID": _zitadel_setting("ZITADEL_SSO_IDP_ID", default=""),
             # role given to users on their first SSO sign-in: doctor, patient or none
             "ZITADEL_SSO_DEFAULT_ROLE": os.getenv("ZITADEL_SSO_DEFAULT_ROLE", default="doctor"),
             "AWS_CONFIG": aws_config(
