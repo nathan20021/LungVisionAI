@@ -34,9 +34,10 @@ def get_record_by_id(userId, recordId):
             jsonify({}),
             404,
         )
+    # shortcut: a record shows at most 100 prescriptions, page them if one ever needs more
     prescriptions = (
         MedicalPrescriptionService.get_paginated_prescription_by_recordId(
-            recordId, 10
+            recordId, 100
         )
     )
     record["prescriptions"] = prescriptions

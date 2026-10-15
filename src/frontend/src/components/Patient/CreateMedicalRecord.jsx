@@ -1,13 +1,20 @@
 import React, { useState } from "react";
-import { FaPlus, FaTrash } from "react-icons/fa";
+import { FaPlus } from "react-icons/fa";
 import { uploadFile } from "../../services/api";
 import { useAuth } from "../../context/Authentication";
 import { dicomToJpeg } from "../../services/dicom";
+import {
+  PrescriptionTable,
+  filledPrescriptions,
+  newPrescriptionRow,
+  prescriptionError,
+} from "./ViewMedicalRecord";
 
 function CreateMedicalRecord({ onBack, onAnalyze }) {
   const { token } = useAuth();
   const [file, setFile] = useState(null);
   const [uploadError, setUploadError] = useState("");
+  const [prescriptionsError, setPrescriptionsError] = useState("");
   const [record, setRecord] = useState({
     note: "",
     treatmentPlan: "",
@@ -39,11 +46,19 @@ function CreateMedicalRecord({ onBack, onAnalyze }) {
     }));
   };
 
-  const handlePrescriptionChange = (id, field, value) => {};
+  const setPrescriptions = (prescriptions) =>
+    setRecord((prev) => ({ ...prev, prescriptions }));
 
-  const addPrescriptionRow = () => {};
+  const addPrescriptionRow = () =>
+    setPrescriptions([...record.prescriptions, newPrescriptionRow()]);
 
-  const removePrescriptionRow = (id) => {};
+  const continueToAnalysis = async () => {
+    const prescriptions = filledPrescriptions(record.prescriptions);
+    const error = prescriptionError(prescriptions);
+    setPrescriptionsError(error);
+    if (error) return;
+    await onAnalyze({ ...record, file: file, prescriptions });
+  };
 
   return (
     <div className="p-6">
@@ -201,101 +216,17 @@ function CreateMedicalRecord({ onBack, onAnalyze }) {
                   Add Medication
                 </button>
               </div>
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
-                        Medication
-                      </th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
-                        Dosage
-                      </th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
-                        Frequency
-                      </th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">
-                        Time
-                      </th>
-                      <th className="px-4 py-2 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {record.prescriptions.map((row) => (
-                      <tr key={row.id}>
-                        <td className="px-4 py-2">
-                          <input
-                            type="text"
-                            value={row.medication}
-                            onChange={(e) =>
-                              handlePrescriptionChange(
-                                row.id,
-                                "medication",
-                                e.target.value
-                              )
-                            }
-                            className="w-full border-0 focus:ring-0"
-                            placeholder="Enter medication"
-                          />
-                        </td>
-                        <td className="px-4 py-2">
-                          <input
-                            type="text"
-                            value={row.dosage}
-                            onChange={(e) =>
-                              handlePrescriptionChange(
-                                row.id,
-                                "dosage",
-                                e.target.value
-                              )
-                            }
-                            className="w-full border-0 focus:ring-0"
-                            placeholder="Enter dosage"
-                          />
-                        </td>
-                        <td className="px-4 py-2">
-                          <input
-                            type="text"
-                            value={row.dosageFrequency}
-                            onChange={(e) =>
-                              handlePrescriptionChange(
-                                row.id,
-                                "dosageFrequency",
-                                e.target.value
-                              )
-                            }
-                            className="w-full border-0 focus:ring-0"
-                            placeholder="Enter frequency"
-                          />
-                        </td>
-                        <td className="px-4 py-2">
-                          <input
-                            type="text"
-                            value={row.time}
-                            onChange={(e) =>
-                              handlePrescriptionChange(
-                                row.id,
-                                "time",
-                                e.target.value
-                              )
-                            }
-                            className="w-full border-0 focus:ring-0"
-                            placeholder="Enter time"
-                          />
-                        </td>
-                        <td className="px-4 py-2">
-                          <button
-                            onClick={() => removePrescriptionRow(row.id)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <FaTrash className="text-sm" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {record.prescriptions.length > 0 && (
+                <PrescriptionTable
+                  rows={record.prescriptions}
+                  onRowsChange={setPrescriptions}
+                />
+              )}
+              {prescriptionsError && (
+                <p role="alert" className="text-error text-sm mt-2">
+                  {prescriptionsError}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -304,13 +235,7 @@ function CreateMedicalRecord({ onBack, onAnalyze }) {
       {/* Action Buttons */}
       <div className="flex justify-end gap-4 mt-8">
         <button
-          onClick={async () => {
-            await onAnalyze({
-              ...record,
-              file: file,
-              prescriptions: record.prescriptions,
-            });
-          }}
+          onClick={continueToAnalysis}
           className="px-6 py-2.5 bg-primary text-white rounded-md hover:bg-primary/90 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-none font-medium"
         >
           Continue to Analysis

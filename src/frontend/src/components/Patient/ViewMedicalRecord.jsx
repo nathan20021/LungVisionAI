@@ -13,6 +13,7 @@ import {
   createPrescription,
   updatePrescription,
   deletePrescription,
+  getMedications,
 } from "../../services/api";
 import { useAuth } from "../../context/Authentication";
 import XrayWithSegmentationBoxes from "./XrayWithSegmentationBoxes";
@@ -26,6 +27,7 @@ const PRIORITY_STYLES = {
 const PRIORITY_OPTIONS = ["Low", "Medium", "High"];
 
 const PRESCRIPTION_FIELDS = [
+  { key: "medicationId", label: "Medication" },
   { key: "dosage", label: "Dosage" },
   { key: "dosageFrequency", label: "Frequency" },
   { key: "time", label: "Time" },
@@ -51,6 +53,50 @@ const readAlertThreshold = () => {
 
 // keys for prescription rows that are not saved yet
 let nextDraftKey = 0;
+
+// what "Add prescription" fills a row with
+export const newPrescriptionRow = () => ({
+  key: `new-${++nextDraftKey}`,
+  medicationId: "",
+  dosage: "",
+  dosageFrequency: "Once per week",
+  time: "",
+  dosageDuration: "",
+});
+
+// Unsaved rows with nothing but a frequency are dropped. Saved rows are only
+// deleted through their remove button.
+export const filledPrescriptions = (rows) =>
+  rows.filter(
+    (row) =>
+      row.id ||
+      PRESCRIPTION_FIELDS.some(
+        ({ key }) => key !== "dosageFrequency" && row[key]?.trim()
+      )
+  );
+
+// The list is the same for every table, so it is fetched once per page load
+let medicationsRequest = null;
+const loadMedications = (token) => {
+  if (!medicationsRequest) {
+    medicationsRequest = getMedications(token).catch((error) => {
+      medicationsRequest = null; // the next attempt fetches again
+      throw error;
+    });
+  }
+  return medicationsRequest;
+};
+
+// Prescriptions saved before the medication list may have no medication
+export const prescriptionError = (rows) => {
+  if (rows.some((row) => !row.id && !row.medicationId)) {
+    return "Choose a medication for each new prescription.";
+  }
+  if (rows.some((row) => !row.dosage?.trim())) {
+    return "Each prescription needs a dosage.";
+  }
+  return "";
+};
 
 export const formatDate = (isoDate) =>
   isoDate
@@ -97,71 +143,139 @@ const BackButton = ({ onClick }) => (
   </button>
 );
 
-// Passing onChange and onRemove turns the cells into inputs
-const PrescriptionTable = ({ rows, onChange, onRemove }) => {
-  const editing = !!onChange;
+// Passing onRowsChange turns the cells into inputs
+export const PrescriptionTable = ({ rows, onRowsChange }) => {
+  const editing = !!onRowsChange;
+  const { token } = useAuth();
+  const [medications, setMedications] = useState([]);
+  const [medicationsError, setMedicationsError] = useState(false);
+
+  const fetchMedications = () => {
+    setMedicationsError(false);
+    loadMedications(token)
+      .then(setMedications)
+      .catch(() => setMedicationsError(true));
+  };
+
+  useEffect(() => {
+    if (editing) fetchMedications();
+  }, [editing, token]);
+
+  const changeRow = (index, key, value) =>
+    onRowsChange(
+      rows.map((row, i) => (i === index ? { ...row, [key]: value } : row))
+    );
+  const removeRow = (index) => onRowsChange(rows.filter((_, i) => i !== index));
+
+  // sections of the medication drop-down, in the order the API sorts them
+  const categories = [...new Set(medications.map((m) => m.category))];
+
   return (
-    <div className="border border-gray-200 rounded-lg overflow-x-auto">
-      <table className="w-full min-w-[420px] text-sm">
-        <thead className="bg-gray-50 text-left text-gray-600">
-          <tr>
-            {PRESCRIPTION_FIELDS.map(({ key, label }) => (
-              <th key={key} className="px-3.5 py-2.5 font-medium">
-                {label}
-              </th>
-            ))}
-            {editing && (
-              <th className="w-10">
-                <span className="sr-only">Remove</span>
-              </th>
-            )}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200">
-          {rows.map((row, index) => (
-            <tr key={row.id ?? row.key}>
+    <>
+      <div className="border border-gray-200 rounded-lg overflow-x-auto">
+        <table className="w-full min-w-[560px] text-sm">
+          <thead className="bg-gray-50 text-left text-gray-600">
+            <tr>
               {PRESCRIPTION_FIELDS.map(({ key, label }) => (
-                <td
-                  key={key}
-                  className={
-                    editing
-                      ? "p-0"
-                      : `px-3.5 py-2.5 ${
-                          key === "dosage" ? "font-medium text-gray-900" : ""
-                        }`
-                  }
-                >
-                  {editing ? (
-                    <input
-                      type="text"
-                      aria-label={`${label}, prescription ${index + 1}`}
-                      placeholder={label}
-                      value={row[key] || ""}
-                      onChange={(e) => onChange(index, key, e.target.value)}
-                      className="w-full bg-transparent px-3.5 py-2.5 focus:outline-none focus:bg-[#eaf2f5]"
-                    />
-                  ) : (
-                    row[key] || "—"
-                  )}
-                </td>
+                <th key={key} className="px-3.5 py-2.5 font-medium">
+                  {label}
+                </th>
               ))}
               {editing && (
-                <td className="px-1">
-                  <button
-                    type="button"
-                    onClick={() => onRemove(index)}
-                    aria-label={`Remove prescription ${index + 1}`}
-                    className="w-8 h-8 flex items-center justify-center rounded-md text-gray-500 hover:text-red-700 hover:bg-red-50 transition"
-                  >
-                    <FiTrash2 className="w-4 h-4" />
-                  </button>
-                </td>
+                <th className="w-10">
+                  <span className="sr-only">Remove</span>
+                </th>
               )}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {rows.map((row, index) => (
+              <tr key={row.id ?? row.key}>
+                {PRESCRIPTION_FIELDS.map(({ key, label }) => (
+                  <td
+                    key={key}
+                    className={
+                      editing
+                        ? "p-0"
+                        : `px-3.5 py-2.5 ${
+                            key === "medicationId" ? "font-medium text-gray-900" : ""
+                          }`
+                    }
+                  >
+                    {editing && key === "medicationId" ? (
+                      <select
+                        aria-label={`${label}, prescription ${index + 1}`}
+                        value={row.medicationId || ""}
+                        onChange={(e) => changeRow(index, key, e.target.value)}
+                        className="w-full bg-transparent px-3.5 py-2.5 focus:outline-none focus:bg-[#eaf2f5]"
+                      >
+                        {/* a chosen medication can be changed, not removed */}
+                        {!row.medicationId && (
+                          <option value="">Select medication</option>
+                        )}
+                        {/* the saved medication while the list loads, or once it is off the list */}
+                        {row.medicationId &&
+                          !medications.some((m) => m.id === row.medicationId) && (
+                            <option value={row.medicationId}>
+                              {row.medication}
+                            </option>
+                          )}
+                        {categories.map((category) => (
+                          <optgroup key={category} label={category}>
+                            {medications
+                              .filter((m) => m.category === category)
+                              .map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {m.name}
+                                </option>
+                              ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    ) : editing ? (
+                      <input
+                        type="text"
+                        aria-label={`${label}, prescription ${index + 1}`}
+                        placeholder={label}
+                        value={row[key] || ""}
+                        onChange={(e) => changeRow(index, key, e.target.value)}
+                        className="w-full bg-transparent px-3.5 py-2.5 focus:outline-none focus:bg-[#eaf2f5]"
+                      />
+                    ) : (
+                      (key === "medicationId" ? row.medication : row[key]) || "—"
+                    )}
+                  </td>
+                ))}
+                {editing && (
+                  <td className="px-1">
+                    <button
+                      type="button"
+                      onClick={() => removeRow(index)}
+                      aria-label={`Remove prescription ${index + 1}`}
+                      className="w-8 h-8 flex items-center justify-center rounded-md text-gray-500 hover:text-red-700 hover:bg-red-50 transition"
+                    >
+                      <FiTrash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {medicationsError && (
+        <p role="alert" className="mt-2 text-sm text-red-700">
+          The medication list could not be loaded.{" "}
+          <button
+            type="button"
+            onClick={fetchMedications}
+            className="font-medium underline"
+          >
+            Try again
+          </button>
+        </p>
+      )}
+    </>
   );
 };
 
@@ -282,36 +396,20 @@ function ViewMedicalRecord({ userId, recordId, onBack }) {
   const setDraftField = (field) => (value) =>
     setDraft((current) => ({ ...current, [field]: value }));
 
-  const changePrescription = (index, field, value) =>
-    setDraft((current) => ({
-      ...current,
-      prescriptions: current.prescriptions.map((row, i) =>
-        i === index ? { ...row, [field]: value } : row
-      ),
-    }));
-
   const addPrescription = () =>
     setDraft((current) => ({
       ...current,
       prescriptions: [
         ...current.prescriptions,
-        { key: `new-${++nextDraftKey}`, dosage: "", dosageFrequency: "", time: "", dosageDuration: "" },
+        newPrescriptionRow(),
       ],
     }));
 
-  const removePrescription = (index) =>
-    setDraft((current) => ({
-      ...current,
-      prescriptions: current.prescriptions.filter((_, i) => i !== index),
-    }));
-
   const saveChanges = async () => {
-    // rows left completely blank are dropped
-    const rows = draft.prescriptions.filter((row) =>
-      PRESCRIPTION_FIELDS.some(({ key }) => row[key]?.trim())
-    );
-    if (rows.some((row) => !row.dosage?.trim())) {
-      setSaveError("Each prescription needs a dosage.");
+    const rows = filledPrescriptions(draft.prescriptions);
+    const error = prescriptionError(rows);
+    if (error) {
+      setSaveError(error);
       return;
     }
 
@@ -734,8 +832,7 @@ function ViewMedicalRecord({ userId, recordId, onBack }) {
                   {draft.prescriptions.length > 0 && (
                     <PrescriptionTable
                       rows={draft.prescriptions}
-                      onChange={changePrescription}
-                      onRemove={removePrescription}
+                      onRowsChange={setDraftField("prescriptions")}
                     />
                   )}
                   <button

@@ -14,6 +14,7 @@ import {
   getPredictionAndReport,
   getSegmentationBoxes,
   createRecordForUser,
+  createPrescription,
   parseRecordData,
 } from "../../services/api";
 import { useAuth } from "../../context/Authentication";
@@ -196,6 +197,27 @@ function PatientMedicalRecords({ patient }) {
       recordWithPrediction,
       token
     );
+    // one at a time, so they are listed in the order they were entered
+    let prescriptionsFailed = false;
+    for (const prescription of recordData.prescriptions || []) {
+      try {
+        const created = await createPrescription(
+          patient.id,
+          newRecord.id,
+          prescription,
+          token
+        );
+        if (!created?.id) prescriptionsFailed = true;
+      } catch (error) {
+        console.error("Could not save a prescription:", error);
+        prescriptionsFailed = true;
+      }
+    }
+    if (prescriptionsFailed) {
+      window.alert(
+        "The record was saved, but some prescriptions were not. Add them from the record's Edit record page."
+      );
+    }
     setMedicalRecords((prevRecords) => [
       ...prevRecords,
       parseRecordData(newRecord),

@@ -270,6 +270,13 @@ export const getSegmentationBoxes = async (userId, xRayUrl, token) => {
   return boxes2;
 };
 
+// The medication list, sorted by category then name
+export const getMedications = async (token) => {
+  return executeHTTPRequest("GET", "/medications", {
+    Authorization: `Bearer ${token}`,
+  });
+};
+
 export const getPrescriptionById = async (userId, recordId, prescriptionId, token) => {
   return executeHTTPRequest(
     "GET",
@@ -289,6 +296,7 @@ export const updatePrescription = async (userId, recordId, prescriptionId, presc
     },
     {},
     {
+      "medicationId": prescription?.medicationId || null,
       "dosage": prescription?.dosage || "",
       "dosageDuration": prescription?.dosageDuration || "",
       "dosageFrequency": prescription?.dosageFrequency || "",
@@ -329,6 +337,7 @@ export const createPrescription = async (userId, recordId, prescription, token) 
     },
     {},
     {
+      "medicationId": prescription?.medicationId || null,
       "dosage": prescription?.dosage || "",
       "dosageDuration": prescription?.dosageDuration || "",
       "dosageFrequency": prescription?.dosageFrequency || "",

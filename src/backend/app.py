@@ -4,13 +4,13 @@ from flask import Flask, json, make_response, request
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
-from runtime import DatabasePool, RuntimeConfig
+from runtime import DatabasePool, MedicalPrescriptionService, RuntimeConfig
 from runtime.data.postgres.base_service import create_schema
 
 from api.oauth import oauth_bp
 from api.user import user_blueprint
 from api.record import record_blueprint
-from api.prescription import prescription_blueprint
+from api.prescription import prescription_blueprint, medication_blueprint
 from api.fileHandler import s3_blueprint
 from api.doctor import doctor_bp
 from api.healthCheck import health_check_bp
@@ -25,6 +25,7 @@ ALLOWED_ORIGINS = [
 DatabasePool.open(wait=True)
 atexit.register(DatabasePool.close)
 create_schema(DatabasePool)
+MedicalPrescriptionService.seed_medications()
 
 app = Flask(__name__)
 CORS(
@@ -40,6 +41,7 @@ app.register_blueprint(user_blueprint, url_prefix="/users")
 app.register_blueprint(record_blueprint, url_prefix="/users/<userId>")
 app.register_blueprint(doctor_bp, url_prefix="/doctors/<doctorId>")
 app.register_blueprint(prescription_blueprint, url_prefix="/users/<userId>/records/<recordId>")
+app.register_blueprint(medication_blueprint)
 app.register_blueprint(s3_blueprint)
 
 
