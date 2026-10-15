@@ -7,7 +7,11 @@ from runtime.config import Config
 from runtime.data.postgres.base_service import create_schema
 from runtime.data.postgres import medical_prescription_service
 from runtime.data.postgres.medical_prescription_service import MedicalPrescriptionService
-from runtime.data.postgres.medical_record_service import MedicalRecordService
+from runtime.data.postgres.medical_record_service import (
+    MedicalRecordService,
+    corrected_report,
+    fix_region_names,
+)
 from runtime.data.postgres.medications import MEDICATIONS
 
 REPORT = {
@@ -268,3 +272,69 @@ def test_medications_left_out_of_the_list_are_deactivated(monkeypatch, records, 
         prescriptions.seed_medications()
 
     assert medication_id(prescriptions, "Amoxicillin") == amoxicillin
+
+
+def test_record_is_created_with_its_prescriptions(records, prescriptions, amoxicillin):
+    created = records.create_new_record(
+        "patient-1",
+        record_body(),
+        [prescription_body(medicationId=amoxicillin), prescription_body(medicationId=amoxicillin, dosage="1g")],
+    )
+
+    saved = prescriptions.get_paginated_prescription_by_recordId(created["id"], 10)["data"]
+    # newest first: the order they were given in, reversed
+    assert [p["dosage"] for p in saved] == ["1g", "500mg"]
+    assert {p["medication"] for p in saved} == {"Amoxicillin"}
+
+
+def test_record_is_not_created_when_a_prescription_has_no_active_medication(
+    monkeypatch, pool, records, amoxicillin
+):
+    patient = f"patient-{uuid.uuid4()}"
+    for medication in (None, str(uuid.uuid4()), "not-a-uuid"):
+        bodies = [prescription_body(medicationId=amoxicillin), prescription_body(medicationId=medication)]
+        assert records.create_new_record(patient, record_body(), bodies) is None
+
+    monkeypatch.setattr(medical_prescription_service, "MEDICATIONS", {"Antibiotics": ["Doxycycline"]})
+    MedicalPrescriptionService(pool).seed_medications()
+    try:
+        assert records.create_new_record(patient, record_body(), [prescription_body(medicationId=amoxicillin)]) is None
+    finally:
+        monkeypatch.undo()
+        MedicalPrescriptionService(pool).seed_medications()
+
+    assert records.get_paginated_record_by_userId(patient, 10)["data"] == []
+
+
+def test_corrected_report_renames_old_region_names():
+    report = {
+        "impression": "Text stays as written.",
+        "predictions": [{"region": "right upper lung zone", "conditions": []}],
+        "segmentationBoxes": [{"label": "left upper lung zone", "x1": 0.1}],
+    }
+
+    fixed = corrected_report(report)
+
+    assert fixed["predictions"][0]["region"] == "cardiac silhouette"
+    assert fixed["segmentationBoxes"][0]["label"] == "right apical zone"
+    assert fixed["impression"] == "Text stays as written."
+    assert fixed["regionNamesCorrected"] is True
+    assert corrected_report({"impression": "No regions."}) is None
+
+
+def test_region_names_are_fixed_once(records, pool):
+    old = records.create_new_record("patient-1", record_body(report={
+        "predictions": [{"region": "cardiac silhouette", "conditions": []}],
+        "segmentationBoxes": [{"label": "cardiac silhouette"}],
+    }))
+
+    assert fix_region_names(pool) >= 1
+    fixed = records.get_record_by_id(old["id"])["report"]
+    assert fixed["predictions"][0]["region"] == "right upper lung zone"
+    assert fixed["segmentationBoxes"][0]["label"] == "right upper lung zone"
+
+    # later starts leave every record alone, including ones saved after the fix
+    new = records.create_new_record("patient-1", record_body())
+    assert fix_region_names(pool) == 0
+    assert records.get_record_by_id(old["id"])["report"] == fixed
+    assert records.get_record_by_id(new["id"])["report"] == REPORT

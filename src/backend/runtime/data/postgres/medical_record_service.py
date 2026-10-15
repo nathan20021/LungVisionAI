@@ -24,14 +24,42 @@ class MedicalRecordService(BasePostgresService):
     def get_record_by_id(self, uuid):
         return super().get_item_by_id(uuid)
 
-    def create_new_record(self, userId, record):
+    def create_new_record(self, userId, record, prescriptions=()):
+        """
+        Insert the record and its prescriptions in one statement: all or nothing.
+        Returns None, saving nothing, unless every prescription has an active medication.
+        """
         return super().query_one(
             f"""
-            INSERT INTO medical_records (user_id, x_ray_url, note, priority, report, treatment_plan)
-            VALUES (%(userId)s, %(xRayUrl)s, %(note)s, %(priority)s, %(report)s, %(treatmentPlan)s)
-            RETURNING {self.columns}
+            WITH new_record AS (
+                INSERT INTO medical_records (user_id, x_ray_url, note, priority, report, treatment_plan)
+                SELECT %(userId)s, %(xRayUrl)s, %(note)s, %(priority)s, %(report)s, %(treatmentPlan)s
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(%(prescriptions)s) AS p
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM medications
+                        WHERE id = (p->>'medicationId')::uuid AND active
+                    )
+                )
+                RETURNING *
+            ), new_prescriptions AS (
+                -- created_at steps by a microsecond so they list in a fixed order
+                INSERT INTO medical_prescriptions
+                    (record_id, medication_id, dosage, dosage_frequency, dosage_duration, "time", created_at)
+                SELECT new_record.id, (p.item->>'medicationId')::uuid, p.item->>'dosage',
+                       p.item->>'dosageFrequency', p.item->>'dosageDuration', p.item->>'time',
+                       now() + p.n * interval '1 microsecond'
+                FROM new_record,
+                     jsonb_array_elements(%(prescriptions)s) WITH ORDINALITY AS p (item, n)
+            )
+            SELECT {self.columns} FROM new_record
             """,
-            {**record, "userId": userId, "report": Jsonb(record["report"])},
+            {
+                **record,
+                "userId": userId,
+                "report": Jsonb(record["report"]),
+                "prescriptions": Jsonb(list(prescriptions)),
+            },
         )
 
     def update_record_by_id(self, uuid, record):
@@ -55,3 +83,74 @@ class MedicalRecordService(BasePostgresService):
             """,
             {**params, "id": uuid},
         )
+
+
+# Region names in reports saved before the model's region-order fix. Until then
+# the model service named the detector's regions in anatomical order, but the
+# detector numbers them alphabetically, so every stored box label and prediction
+# region carried another region's name. The written findings and impression were
+# generated from those names and cannot be fixed here; corrected reports get
+# "regionNamesCorrected" so the record view can say so.
+REGION_NAMES_MIGRATION = "2026-10-region-names"
+
+# The order the model service used to name the detector's classes in
+OLD_ORDER = [
+    "right upper lung zone",
+    "right mid lung zone",
+    "right lower lung zone",
+    "right costophrenic angle",
+    "right hilar structures",
+    "right apical zone",
+    "left upper lung zone",
+    "left mid lung zone",
+    "left lower lung zone",
+    "left costophrenic angle",
+    "left hilar structures",
+    "cardiac silhouette",
+]
+# old name -> the region it really was
+TRUE_NAME = dict(zip(OLD_ORDER, sorted(OLD_ORDER)))
+
+
+def corrected_report(report):
+    """The report with its regions renamed, or None when it names no regions."""
+    fixed = dict(report)
+    renamed = False
+    for items_key, name_key in (("predictions", "region"), ("segmentationBoxes", "label")):
+        items = report.get(items_key)
+        if not isinstance(items, list):
+            continue
+        fixed[items_key] = [
+            {**item, name_key: TRUE_NAME[item[name_key]]}
+            if isinstance(item, dict) and item.get(name_key) in TRUE_NAME
+            else item
+            for item in items
+        ]
+        renamed = renamed or fixed[items_key] != items
+    if not renamed:
+        return None
+    return {**fixed, "regionNamesCorrected": True}
+
+
+def fix_region_names(pool):
+    """Correct every stored report once; later starts do nothing. Returns how many changed."""
+    with pool.connection() as conn:  # one transaction: all reports or none
+        first_run = conn.execute(
+            "INSERT INTO schema_migrations (name) VALUES (%s) ON CONFLICT DO NOTHING RETURNING name",
+            (REGION_NAMES_MIGRATION,),
+        ).fetchone()
+        if not first_run:
+            return 0
+        changed = 0
+        rows = conn.execute(
+            "SELECT id, report FROM medical_records WHERE jsonb_typeof(report) = 'object' FOR UPDATE"
+        ).fetchall()
+        for record_id, report in rows:
+            fixed = corrected_report(report)
+            if fixed:
+                conn.execute(
+                    "UPDATE medical_records SET report = %s WHERE id = %s", (Jsonb(fixed), record_id)
+                )
+                changed += 1
+        print(f"region names corrected in {changed} saved reports")
+        return changed

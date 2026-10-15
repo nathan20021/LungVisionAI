@@ -9,6 +9,17 @@
   --color-primaryHover: #4c92ae;
   --color-secondary: #68b0e7;
   --color-secondaryHover: #90c9f4;
+
+  /* critically damped spring (damping 1.0, response 0.3 s) */
+  --ease-spring: linear(0, 0.097, 0.282, 0.466, 0.619, 0.736, 0.821, 0.881, 0.921, 0.949, 0.967, 0.979, 0.986, 0.991, 0.995, 0.997, 0.999, 1);
+
+  --animate-box-in: box-in 0.5s var(--ease-spring) both;
+  @keyframes box-in {
+    from {
+      opacity: 0;
+      transform: scale(1.12);
+    }
+  }
 }
 
 /*

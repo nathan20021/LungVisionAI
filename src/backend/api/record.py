@@ -1,10 +1,12 @@
 from decorators.login_required import requires_doctor_or_own_patient_scope, requires_scopes
+from api.prescription import parse_prescription
 from flask import Blueprint, g, jsonify, request
 from runtime import MedicalRecordService, MedicalPrescriptionService
 from runtime import ReportGenerationService, PredictionService
 from scopes import DOCTOR_RECORDS_READ, DOCTOR_RECORDS_WRITE, PATIENT_RECORDS_READ
 
 record_blueprint = Blueprint("record", __name__)
+
 
 
 @record_blueprint.route("/records", methods=["GET"])
@@ -75,7 +77,17 @@ def create_new_record(userId):
         "report": request.json.get("report", ""),
         "treatmentPlan": request.json.get("treatmentPlan", ""),
     }
-    newRecord = MedicalRecordService.create_new_record(userId, record_info)
+    prescriptions = request.json.get("prescriptions", [])
+    if not isinstance(prescriptions, list):
+        prescriptions = [None]
+    prescriptions = [parse_prescription(p) for p in prescriptions]
+    if any(p is None for p in prescriptions):
+        return jsonify({"error": "prescriptions must be a list of objects whose fields are strings"}), 400
+    if not all(p["medicationId"] for p in prescriptions):
+        return jsonify({"error": "Each prescription needs a medication"}), 400
+    newRecord = MedicalRecordService.create_new_record(userId, record_info, prescriptions)
+    if not newRecord:
+        return jsonify({"error": "The record could not be created: check each prescription's medication"}), 400
     return (
         jsonify(newRecord),
         200,

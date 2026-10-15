@@ -1,8 +1,8 @@
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import {
   PrescriptionTable,
-  filledPrescriptions,
-  newPrescriptionRow,
+  completePrescriptions,
+  blankPrescription,
   prescriptionError,
 } from "../ViewMedicalRecord";
 import { getMedications } from "../../../services/api";
@@ -31,7 +31,7 @@ const medications = [
 test("the saved medication stays shown when the list fails, and the list can be retried", async () => {
   getMedications.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(medications);
   const onRowsChange = jest.fn();
-  const fresh = newPrescriptionRow();
+  const fresh = blankPrescription();
   render(<PrescriptionTable rows={[saved, fresh]} onRowsChange={onRowsChange} />);
 
   const savedSelect = screen.getByLabelText("Medication, prescription 1");
@@ -51,19 +51,22 @@ test("the saved medication stays shown when the list fails, and the list can be 
   expect(screen.getByLabelText("Frequency, prescription 2")).toHaveValue("Once per week");
 
   fireEvent.change(freshSelect, { target: { value: "med-furo" } });
-  expect(onRowsChange).toHaveBeenCalledWith([saved, { ...fresh, medicationId: "med-furo" }]);
+  expect(onRowsChange).toHaveBeenCalledWith([
+    saved,
+    { ...fresh, medicationId: "med-furo", medication: "Furosemide (Lasix)" },
+  ]);
 
   fireEvent.click(screen.getByLabelText("Remove prescription 1"));
   expect(onRowsChange).toHaveBeenLastCalledWith([fresh]);
 });
 
 test("only unsaved rows with nothing but a frequency are dropped", () => {
-  const untouched = newPrescriptionRow();
-  const frequencyCleared = { ...newPrescriptionRow(), dosageFrequency: "" };
+  const untouched = blankPrescription();
+  const frequencyCleared = { ...blankPrescription(), dosageFrequency: "" };
   const savedButCleared = { ...saved, medicationId: null, dosage: "", dosageFrequency: "Once per week" };
-  const noMedication = { ...newPrescriptionRow(), dosage: "40 mg" };
+  const noMedication = { ...blankPrescription(), dosage: "40 mg" };
 
-  expect(filledPrescriptions([untouched, frequencyCleared, savedButCleared])).toEqual([savedButCleared]);
+  expect(completePrescriptions([untouched, frequencyCleared, savedButCleared])).toEqual([savedButCleared]);
   expect(prescriptionError([savedButCleared])).toBe("Each prescription needs a dosage.");
   expect(prescriptionError([noMedication])).toBe("Choose a medication for each new prescription.");
   expect(prescriptionError([saved, { ...noMedication, medicationId: "med-amox" }])).toBe("");

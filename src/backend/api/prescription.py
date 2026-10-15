@@ -7,11 +7,10 @@ prescription_blueprint = Blueprint("record_prescription", __name__)
 medication_blueprint = Blueprint("medication", __name__)
 
 
-def prescription_from_request():
-    """The prescription in the request body. Aborts with 400 unless every field is a string or null."""
-    body = request.get_json(silent=True)
+def parse_prescription(body):
+    """The prescription fields of a JSON object, or None unless each is a string or null."""
     if not isinstance(body, dict):
-        abort(400, "The body must be a JSON object.")
+        return None
     prescription = {
         # "" or a missing medication counts as none
         "medicationId": body.get("medicationId") or None,
@@ -21,7 +20,15 @@ def prescription_from_request():
         "time": body.get("time", ""),
     }
     if not all(value is None or isinstance(value, str) for value in prescription.values()):
-        abort(400, "Prescription fields must be strings.")
+        return None
+    return prescription
+
+
+def prescription_from_request():
+    """The prescription in the request body. Aborts with 400 unless it is a JSON object of strings."""
+    prescription = parse_prescription(request.get_json(silent=True))
+    if prescription is None:
+        abort(400, "A prescription must be a JSON object whose fields are strings.")
     return prescription
 
 

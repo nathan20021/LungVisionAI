@@ -47,3 +47,9 @@ CREATE INDEX IF NOT EXISTS medical_prescriptions_record_id_idx
 -- Prescriptions written before the medication list have none.
 ALTER TABLE medical_prescriptions
     ADD COLUMN IF NOT EXISTS medication_id UUID REFERENCES medications (id);
+
+-- One-time data fixes that already ran (see medical_record_service.py)
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    name TEXT PRIMARY KEY,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

@@ -6,6 +6,7 @@ from werkzeug.exceptions import HTTPException
 
 from runtime import DatabasePool, MedicalPrescriptionService, RuntimeConfig
 from runtime.data.postgres.base_service import create_schema
+from runtime.data.postgres.medical_record_service import fix_region_names
 
 from api.oauth import oauth_bp
 from api.user import user_blueprint
@@ -25,6 +26,7 @@ ALLOWED_ORIGINS = [
 DatabasePool.open(wait=True)
 atexit.register(DatabasePool.close)
 create_schema(DatabasePool)
+fix_region_names(DatabasePool)
 MedicalPrescriptionService.seed_medications()
 
 app = Flask(__name__)

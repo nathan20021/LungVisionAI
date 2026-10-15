@@ -13,10 +13,13 @@ SAVED = {"id": "rx-1", "recordId": "rec-1", "medicationId": "med-1", "medication
 @pytest.fixture
 def client():
     from api.prescription import medication_blueprint, prescription_blueprint
+    from api.record import record_blueprint
 
     runtime.MedicalPrescriptionService.reset_mock(return_value=True)
+    runtime.MedicalRecordService.reset_mock(return_value=True)
     app = Flask(__name__)
     app.register_blueprint(prescription_blueprint, url_prefix="/users/<userId>/records/<recordId>")
+    app.register_blueprint(record_blueprint, url_prefix="/users/<userId>")
     app.register_blueprint(medication_blueprint)
     return app.test_client()
 
@@ -76,3 +79,22 @@ def test_prescriptions_are_reached_through_their_record(client):
     )
     assert client.get(f"{PATH}/prescriptions/rx-1", headers=DOCTOR).status_code == 200
     service.get_prescription_by_id.assert_called_once_with("rec-1", "rx-1")
+
+
+def test_record_is_created_only_with_valid_prescriptions(client):
+    create = runtime.MedicalRecordService.create_new_record
+    record = {"xRayUrl": "x", "note": "", "priority": "Low", "report": {}, "treatmentPlan": ""}
+    for prescriptions in ([{"dosage": "1 g"}], [{"medicationId": 5}], ["med-1"], {"medicationId": "med-1"}):
+        response = client.post("/users/pat-1/record", json={**record, "prescriptions": prescriptions}, headers=DOCTOR)
+        assert response.status_code == 400
+    create.assert_not_called()
+
+    create.return_value = None
+    body = {**record, "prescriptions": [{"medicationId": "med-1", "dosage": "1 g"}]}
+    assert client.post("/users/pat-1/record", json=body, headers=DOCTOR).status_code == 400
+
+    create.return_value = {"id": "rec-1"}
+    assert client.post("/users/pat-1/record", json=body, headers=DOCTOR).status_code == 200
+    assert create.call_args.args[2] == [
+        {"medicationId": "med-1", "dosage": "1 g", "dosageFrequency": "", "dosageDuration": "", "time": ""}
+    ]
