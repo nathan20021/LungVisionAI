@@ -52,6 +52,22 @@ const readAlertThreshold = () => {
 // keys for prescription rows that are not saved yet
 let nextDraftKey = 0;
 
+export const blankPrescription = () => ({
+  key: `new-${++nextDraftKey}`,
+  dosage: "",
+  dosageFrequency: "",
+  time: "",
+  dosageDuration: "",
+});
+
+// Drops rows left completely blank; null when a remaining row has no dosage
+export const completePrescriptions = (rows) => {
+  const filled = rows.filter((row) =>
+    PRESCRIPTION_FIELDS.some(({ key }) => row[key]?.trim())
+  );
+  return filled.some((row) => !row.dosage?.trim()) ? null : filled;
+};
+
 export const formatDate = (isoDate) =>
   isoDate
     ? new Date(isoDate).toLocaleDateString(undefined, { dateStyle: "medium" })
@@ -86,11 +102,11 @@ export const TextSection = ({ title, text, emptyText, onChange }) => (
   </div>
 );
 
-const BackButton = ({ onClick }) => (
+const BackButton = ({ onClick, label = "Back to records" }) => (
   <button
     type="button"
     onClick={onClick}
-    aria-label="Back to records"
+    aria-label={label}
     className="w-10 h-10 shrink-0 rounded-lg border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-50 active:scale-95 transition"
   >
     <FiChevronLeft className="w-5 h-5" />
@@ -98,7 +114,7 @@ const BackButton = ({ onClick }) => (
 );
 
 // Passing onChange and onRemove turns the cells into inputs
-const PrescriptionTable = ({ rows, onChange, onRemove }) => {
+export const PrescriptionTable = ({ rows, onChange, onRemove }) => {
   const editing = !!onChange;
   return (
     <div className="border border-gray-200 rounded-lg overflow-x-auto">
@@ -165,9 +181,11 @@ const PrescriptionTable = ({ rows, onChange, onRemove }) => {
   );
 };
 
-function ViewMedicalRecord({ userId, recordId, onBack }) {
+// Pass newRecord (with onSave) to show a record that is not saved yet, in the
+// same layout it will have once saved. Edits then stay local until onSave.
+function ViewMedicalRecord({ userId, recordId, onBack, newRecord, onSave }) {
   const { token } = useAuth();
-  const [record, setRecord] = useState(null);
+  const [record, setRecord] = useState(newRecord || null);
   const [loadError, setLoadError] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState(null);
   const [alertThreshold, setAlertThreshold] = useState(readAlertThreshold);
@@ -183,7 +201,9 @@ function ViewMedicalRecord({ userId, recordId, onBack }) {
       .catch(() => setLoadError(true));
   };
 
-  useEffect(loadRecord, [userId, recordId, token]);
+  useEffect(() => {
+    if (!newRecord) loadRecord();
+  }, [userId, recordId, token]);
 
   const changeAlertThreshold = (value) => {
     setAlertThreshold(value);
@@ -276,7 +296,8 @@ function ViewMedicalRecord({ userId, recordId, onBack }) {
 
   const goBack = () => {
     if (draft && !window.confirm("Discard your unsaved changes?")) return;
-    onBack();
+    // a new record hands back its edits so they survive a trip back to step 1
+    onBack(record);
   };
 
   const setDraftField = (field) => (value) =>
@@ -293,10 +314,7 @@ function ViewMedicalRecord({ userId, recordId, onBack }) {
   const addPrescription = () =>
     setDraft((current) => ({
       ...current,
-      prescriptions: [
-        ...current.prescriptions,
-        { key: `new-${++nextDraftKey}`, dosage: "", dosageFrequency: "", time: "", dosageDuration: "" },
-      ],
+      prescriptions: [...current.prescriptions, blankPrescription()],
     }));
 
   const removePrescription = (index) =>
@@ -306,12 +324,24 @@ function ViewMedicalRecord({ userId, recordId, onBack }) {
     }));
 
   const saveChanges = async () => {
-    // rows left completely blank are dropped
-    const rows = draft.prescriptions.filter((row) =>
-      PRESCRIPTION_FIELDS.some(({ key }) => row[key]?.trim())
-    );
-    if (rows.some((row) => !row.dosage?.trim())) {
+    const rows = completePrescriptions(draft.prescriptions);
+    if (!rows) {
       setSaveError("Each prescription needs a dosage.");
+      return;
+    }
+
+    if (newRecord) {
+      // nothing is stored yet: the edits wait here until onSave
+      setSaveError("");
+      setRecord({
+        ...record,
+        priority: draft.priority,
+        note: draft.note,
+        treatmentPlan: draft.treatmentPlan,
+        report: { ...report, impression: draft.impression, findings: draft.findings },
+        prescriptions: { data: rows },
+      });
+      setDraft(null);
       return;
     }
 
@@ -390,6 +420,17 @@ function ViewMedicalRecord({ userId, recordId, onBack }) {
     }
   };
 
+  const saveNewRecord = async () => {
+    setSaving(true);
+    setSaveError("");
+    try {
+      await onSave(record);
+    } catch (error) {
+      setSaveError(error.message);
+      setSaving(false);
+    }
+  };
+
   const hasAiContent = report.impression || report.findings || regions.length > 0;
 
   return (
@@ -397,14 +438,23 @@ function ViewMedicalRecord({ userId, recordId, onBack }) {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div className="flex items-start gap-3">
-          <BackButton onClick={goBack} />
+          <BackButton
+            onClick={goBack}
+            label={newRecord ? "Back to record details" : undefined}
+          />
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
-              {`RID-${record.id.split("-")[0]}`}
+              {newRecord ? "New record" : `RID-${record.id.split("-")[0]}`}
             </h1>
             <p className="text-sm text-gray-600 mt-1">
-              Created {formatDate(record.created_at)} · Updated{" "}
-              {formatDate(record.updated_at)}
+              {newRecord ? (
+                "Not saved yet. Review the AI analysis, then save the record."
+              ) : (
+                <>
+                  Created {formatDate(record.created_at)} · Updated{" "}
+                  {formatDate(record.updated_at)}
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -441,7 +491,7 @@ function ViewMedicalRecord({ userId, recordId, onBack }) {
                 disabled={saving}
                 className="px-4 py-2 bg-primary text-white rounded-md hover:bg-[#2c5465] active:scale-[0.97] transition font-medium disabled:opacity-60"
               >
-                {saving ? "Saving…" : "Save changes"}
+                {saving ? "Saving…" : newRecord ? "Done" : "Save changes"}
               </button>
             </>
           ) : (
@@ -455,11 +505,22 @@ function ViewMedicalRecord({ userId, recordId, onBack }) {
               <button
                 type="button"
                 onClick={startEditing}
-                className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 active:scale-[0.97] transition font-medium"
+                disabled={saving}
+                className="disabled:opacity-50 inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 active:scale-[0.97] transition font-medium"
               >
                 <FiEdit2 className="w-4 h-4" />
                 Edit record
               </button>
+              {newRecord && (
+                <button
+                  type="button"
+                  onClick={saveNewRecord}
+                  disabled={saving}
+                  className="px-4 py-2 bg-primary text-white rounded-md hover:bg-[#2c5465] active:scale-[0.97] transition font-medium disabled:opacity-60"
+                >
+                  {saving ? "Saving…" : "Save record"}
+                </button>
+              )}
             </>
           )}
         </div>
