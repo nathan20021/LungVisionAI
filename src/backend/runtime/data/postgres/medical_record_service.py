@@ -25,18 +25,32 @@ class MedicalRecordService(BasePostgresService):
         return super().get_item_by_id(uuid)
 
     def create_new_record(self, userId, record, prescriptions=()):
-        """Insert the record and its prescriptions in one statement: all or nothing."""
+        """
+        Insert the record and its prescriptions in one statement: all or nothing.
+        Returns None, saving nothing, unless every prescription has an active medication.
+        """
         return super().query_one(
             f"""
             WITH new_record AS (
                 INSERT INTO medical_records (user_id, x_ray_url, note, priority, report, treatment_plan)
-                VALUES (%(userId)s, %(xRayUrl)s, %(note)s, %(priority)s, %(report)s, %(treatmentPlan)s)
+                SELECT %(userId)s, %(xRayUrl)s, %(note)s, %(priority)s, %(report)s, %(treatmentPlan)s
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(%(prescriptions)s) AS p
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM medications
+                        WHERE id = (p->>'medicationId')::uuid AND active
+                    )
+                )
                 RETURNING *
             ), new_prescriptions AS (
+                -- created_at steps by a microsecond so they list in a fixed order
                 INSERT INTO medical_prescriptions
-                    (record_id, dosage, dosage_frequency, dosage_duration, "time")
-                SELECT new_record.id, p->>'dosage', p->>'dosageFrequency', p->>'dosageDuration', p->>'time'
-                FROM new_record, jsonb_array_elements(%(prescriptions)s) AS p
+                    (record_id, medication_id, dosage, dosage_frequency, dosage_duration, "time", created_at)
+                SELECT new_record.id, (p.item->>'medicationId')::uuid, p.item->>'dosage',
+                       p.item->>'dosageFrequency', p.item->>'dosageDuration', p.item->>'time',
+                       now() + p.n * interval '1 microsecond'
+                FROM new_record,
+                     jsonb_array_elements(%(prescriptions)s) WITH ORDINALITY AS p (item, n)
             )
             SELECT {self.columns} FROM new_record
             """,

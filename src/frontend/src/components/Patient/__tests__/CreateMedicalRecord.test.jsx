@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import CreateMedicalRecord from "../CreateMedicalRecord";
 import {
   uploadFile,
@@ -6,6 +6,7 @@ import {
   getSegmentationBoxes,
   createRecordForUser,
   createPrescription,
+  getMedications,
 } from "../../../services/api";
 
 jest.mock("../../../services/api", () => ({
@@ -18,6 +19,7 @@ jest.mock("../../../services/api", () => ({
   updateMedicalRecord: jest.fn(),
   updatePrescription: jest.fn(),
   deletePrescription: jest.fn(),
+  getMedications: jest.fn(),
 }));
 jest.mock("../../../services/dicom", () => ({ dicomToJpeg: jest.fn() }));
 jest.mock("../../../context/Authentication", () => ({
@@ -50,6 +52,9 @@ beforeEach(() => {
   window.localStorage.clear();
   uploadFile.mockResolvedValue(XRAY_URL);
   getSegmentationBoxes.mockResolvedValue([]);
+  getMedications.mockResolvedValue([
+    { id: "med-amox", name: "Amoxicillin", category: "Antibiotics" },
+  ]);
 });
 
 const renderFlow = (onCreated = () => {}) =>
@@ -96,10 +101,18 @@ test("saving creates the record and its prescriptions in one request", async () 
   expect(await screen.findByText("Ready to review")).toBeInTheDocument();
   fireEvent.click(screen.getByText("Add prescription"));
   fireEvent.change(screen.getByLabelText("Dosage, prescription 1"), {
-    target: { value: "Amoxicillin 1 g" },
+    target: { value: "1 g" },
   });
   fireEvent.click(screen.getByText("Continue to analysis"));
-  fireEvent.click(await screen.findByText("Save record"));
+  expect(screen.getByRole("alert")).toHaveTextContent("Choose a medication for each new prescription.");
+
+  const medication = screen.getByLabelText("Medication, prescription 1");
+  await within(medication).findByText("Amoxicillin");
+  fireEvent.change(medication, { target: { value: "med-amox" } });
+  fireEvent.click(screen.getByText("Continue to analysis"));
+  // the unsaved prescription shows its medication by name on the review
+  expect(await screen.findByText("Amoxicillin")).toBeInTheDocument();
+  fireEvent.click(screen.getByText("Save record"));
 
   await waitFor(() => expect(onCreated).toHaveBeenCalledWith({ id: "rec-1" }));
   expect(createRecordForUser).toHaveBeenCalledWith(
@@ -107,7 +120,15 @@ test("saving creates the record and its prescriptions in one request", async () 
     expect.objectContaining({
       xRayUrl: XRAY_URL,
       report: expect.objectContaining({ impression: "Right lower zone consolidation" }),
-      prescriptions: { data: [expect.objectContaining({ dosage: "Amoxicillin 1 g" })] },
+      prescriptions: {
+        data: [
+          expect.objectContaining({
+            medicationId: "med-amox",
+            dosage: "1 g",
+            dosageFrequency: "Once per week",
+          }),
+        ],
+      },
     }),
     "token"
   );

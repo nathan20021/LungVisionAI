@@ -116,7 +116,9 @@ function PatientOverview({ patient, records, onCreate, onView }) {
               {prescriptions.map((prescription) => (
                 <li key={prescription.id} className="py-2 first:pt-0">
                   <p className="text-[15px] font-semibold text-gray-900">
-                    {prescription.dosage}
+                    {[prescription.medication, prescription.dosage]
+                      .filter(Boolean)
+                      .join(" ")}
                   </p>
                   <p className="text-sm text-gray-600">
                     {[

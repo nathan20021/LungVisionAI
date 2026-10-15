@@ -5,12 +5,14 @@ import pytest
 from psycopg_pool import ConnectionPool, PoolTimeout
 from runtime.config import Config
 from runtime.data.postgres.base_service import create_schema
+from runtime.data.postgres import medical_prescription_service
 from runtime.data.postgres.medical_prescription_service import MedicalPrescriptionService
 from runtime.data.postgres.medical_record_service import (
     MedicalRecordService,
     corrected_report,
     fix_region_names,
 )
+from runtime.data.postgres.medications import MEDICATIONS
 
 REPORT = {
     "findings": "1. Right upper lobe: consolidation.",
@@ -34,7 +36,10 @@ def record_body(**fields):
 
 
 def prescription_body(**fields):
-    body = {"dosage": "500mg", "dosageFrequency": "daily", "dosageDuration": "7 days", "time": "8PM"}
+    body = {
+        "medicationId": None, "dosage": "500mg", "dosageFrequency": "daily",
+        "dosageDuration": "7 days", "time": "8PM",
+    }
     return {**body, **fields}
 
 
@@ -53,6 +58,7 @@ def pool():
     with pool.connection() as conn:
         conn.execute(f"CREATE SCHEMA {schema}")
     create_schema(pool)
+    MedicalPrescriptionService(pool).seed_medications()
     yield pool
     with pool.connection() as conn:
         conn.execute(f"DROP SCHEMA {schema} CASCADE")
@@ -71,6 +77,26 @@ def prescriptions(pool):
 
 def test_schema_can_be_applied_on_every_start(pool):
     create_schema(pool)
+
+
+def test_medications_are_seeded_once_by_category(prescriptions):
+    medications = prescriptions.get_medications()
+    prescriptions.seed_medications()
+
+    assert prescriptions.get_medications() == medications
+    assert [m["category"] for m in medications] == sorted(m["category"] for m in medications)
+    assert {m["name"]: m["category"] for m in medications} == {
+        name: category for category, names in MEDICATIONS.items() for name in names
+    }
+
+
+def medication_id(prescriptions, name):
+    return next(m["id"] for m in prescriptions.get_medications() if m["name"] == name)
+
+
+@pytest.fixture
+def amoxicillin(prescriptions):
+    return medication_id(prescriptions, "Amoxicillin")
 
 
 def test_record_keeps_api_keys_and_report(records):
@@ -140,47 +166,144 @@ def test_records_are_paged_newest_first_without_report(records):
     assert records.get_paginated_record_by_userId(patient, 2, "not-a-uuid") == {"data": [], "next": None}
 
 
-def test_prescriptions_of_a_record(records, prescriptions):
+def test_prescriptions_of_a_record(records, prescriptions, amoxicillin):
     record = records.create_new_record("patient-1", record_body())
-    first = prescriptions.create_new_prescription(record["id"], prescription_body())
-    second = prescriptions.create_new_prescription(record["id"], prescription_body(dosage="250mg"))
+    first = prescriptions.create_new_prescription(record["id"], prescription_body(medicationId=amoxicillin))
+    second = prescriptions.create_new_prescription(
+        record["id"], prescription_body(medicationId=amoxicillin, dosage="250mg")
+    )
 
     assert second["recordId"] == record["id"]
-    assert (second["dosage"], second["dosageFrequency"], second["time"]) == ("250mg", "daily", "8PM")
+    assert (second["medication"], second["dosage"], second["dosageFrequency"], second["time"]) == (
+        "Amoxicillin", "250mg", "daily", "8PM"
+    )
     assert prescriptions.get_paginated_prescription_by_recordId(record["id"], 10) == {
         "data": [second, first],
         "next": None,
     }
 
-    updated = prescriptions.update_prescription_by_id(first["id"], prescription_body(dosageDuration="14 days"))
+    updated = prescriptions.update_prescription_by_id(
+        record["id"], first["id"], prescription_body(dosageDuration="14 days")
+    )
     assert updated["dosageDuration"] == "14 days"
-    assert prescriptions.get_prescription_by_id(first["id"]) == updated
+    assert prescriptions.get_prescription_by_id(record["id"], first["id"]) == updated
 
 
-def test_prescription_needs_an_existing_record(prescriptions):
-    assert prescriptions.create_new_prescription(str(uuid.uuid4()), prescription_body()) is None
-    assert prescriptions.create_new_prescription("not-a-uuid", prescription_body()) is None
+def test_prescription_needs_an_existing_record(prescriptions, amoxicillin):
+    body = prescription_body(medicationId=amoxicillin)
+    assert prescriptions.create_new_prescription(str(uuid.uuid4()), body) is None
+    assert prescriptions.create_new_prescription("not-a-uuid", body) is None
     assert prescriptions.get_paginated_prescription_by_recordId("not-a-uuid", 10) == {"data": [], "next": None}
 
 
-def test_prescription_is_deleted_only_from_its_record(records, prescriptions):
+def test_prescription_is_reached_only_through_its_record(records, prescriptions, amoxicillin):
     record = records.create_new_record("patient-1", record_body())
-    other = records.create_new_record("patient-1", record_body())
-    prescription = prescriptions.create_new_prescription(record["id"], prescription_body())
+    other = records.create_new_record("patient-2", record_body())
+    prescription = prescriptions.create_new_prescription(record["id"], prescription_body(medicationId=amoxicillin))
 
+    assert prescriptions.get_prescription_by_id(other["id"], prescription["id"]) is None
+    assert prescriptions.update_prescription_by_id(other["id"], prescription["id"], prescription_body()) is None
     assert prescriptions.delete_prescription_by_id(other["id"], prescription["id"]) is None
+    assert prescriptions.get_prescription_by_id(record["id"], prescription["id"]) == prescription
+
     assert prescriptions.delete_prescription_by_id(record["id"], prescription["id"]) == prescription
-    assert prescriptions.get_prescription_by_id(prescription["id"]) is None
+    assert prescriptions.get_prescription_by_id(record["id"], prescription["id"]) is None
     assert prescriptions.delete_prescription_by_id(record["id"], "not-a-uuid") is None
 
 
-def test_record_is_created_with_its_prescriptions(records, prescriptions):
+def test_prescription_medication_can_change_but_not_be_removed(records, prescriptions, amoxicillin):
+    record = records.create_new_record("patient-1", record_body())
+    created = prescriptions.create_new_prescription(record["id"], prescription_body(medicationId=amoxicillin))
+    assert (created["medicationId"], created["medication"]) == (amoxicillin, "Amoxicillin")
+
+    doxycycline = medication_id(prescriptions, "Doxycycline")
+    updated = prescriptions.update_prescription_by_id(
+        record["id"], created["id"], prescription_body(medicationId=doxycycline)
+    )
+    assert (updated["medicationId"], updated["medication"]) == (doxycycline, "Doxycycline")
+
+    kept = prescriptions.update_prescription_by_id(record["id"], created["id"], prescription_body())
+    assert (kept["medicationId"], kept["medication"]) == (doxycycline, "Doxycycline")
+
+
+def test_prescription_needs_a_known_medication(records, prescriptions):
+    record = records.create_new_record("patient-1", record_body())
+    for unknown in (None, str(uuid.uuid4()), "not-a-uuid"):
+        assert prescriptions.create_new_prescription(record["id"], prescription_body(medicationId=unknown)) is None
+
+
+def test_prescription_written_before_the_medication_list_stays_editable(pool, records, prescriptions):
+    record = records.create_new_record("patient-1", record_body())
+    with pool.connection() as conn:
+        (legacy_id,) = conn.execute(
+            "INSERT INTO medical_prescriptions (record_id, dosage) VALUES (%s, '1 g') RETURNING id::text",
+            (record["id"],),
+        ).fetchone()
+
+    updated = prescriptions.update_prescription_by_id(record["id"], legacy_id, prescription_body(dosage="2 g"))
+    assert (updated["medicationId"], updated["medication"], updated["dosage"]) == (None, None, "2 g")
+
+
+def test_medications_left_out_of_the_list_are_deactivated(monkeypatch, records, prescriptions, amoxicillin):
+    record = records.create_new_record("patient-1", record_body())
+    created = prescriptions.create_new_prescription(record["id"], prescription_body(medicationId=amoxicillin))
+    doxycycline = medication_id(prescriptions, "Doxycycline")
+    monkeypatch.setattr(
+        medical_prescription_service, "MEDICATIONS", {"Antibiotics": ["Doxycycline"]}
+    )
+    prescriptions.seed_medications()
+
+    try:
+        assert [m["name"] for m in prescriptions.get_medications()] == ["Doxycycline"]
+        # existing prescriptions keep a deactivated medication, new ones cannot use it
+        assert prescriptions.get_prescription_by_id(record["id"], created["id"])["medication"] == "Amoxicillin"
+        assert prescriptions.update_prescription_by_id(
+            record["id"], created["id"], prescription_body(medicationId=amoxicillin)
+        )["medication"] == "Amoxicillin"
+        assert prescriptions.create_new_prescription(
+            record["id"], prescription_body(medicationId=amoxicillin)
+        ) is None
+        other = prescriptions.create_new_prescription(record["id"], prescription_body(medicationId=doxycycline))
+        assert prescriptions.update_prescription_by_id(
+            record["id"], other["id"], prescription_body(medicationId=amoxicillin)
+        ) is None
+    finally:
+        monkeypatch.undo()
+        prescriptions.seed_medications()
+
+    assert medication_id(prescriptions, "Amoxicillin") == amoxicillin
+
+
+def test_record_is_created_with_its_prescriptions(records, prescriptions, amoxicillin):
     created = records.create_new_record(
-        "patient-1", record_body(), [prescription_body(), prescription_body(dosage="1g")]
+        "patient-1",
+        record_body(),
+        [prescription_body(medicationId=amoxicillin), prescription_body(medicationId=amoxicillin, dosage="1g")],
     )
 
     saved = prescriptions.get_paginated_prescription_by_recordId(created["id"], 10)["data"]
-    assert sorted(p["dosage"] for p in saved) == ["1g", "500mg"]
+    # newest first: the order they were given in, reversed
+    assert [p["dosage"] for p in saved] == ["1g", "500mg"]
+    assert {p["medication"] for p in saved} == {"Amoxicillin"}
+
+
+def test_record_is_not_created_when_a_prescription_has_no_active_medication(
+    monkeypatch, pool, records, amoxicillin
+):
+    patient = f"patient-{uuid.uuid4()}"
+    for medication in (None, str(uuid.uuid4()), "not-a-uuid"):
+        bodies = [prescription_body(medicationId=amoxicillin), prescription_body(medicationId=medication)]
+        assert records.create_new_record(patient, record_body(), bodies) is None
+
+    monkeypatch.setattr(medical_prescription_service, "MEDICATIONS", {"Antibiotics": ["Doxycycline"]})
+    MedicalPrescriptionService(pool).seed_medications()
+    try:
+        assert records.create_new_record(patient, record_body(), [prescription_body(medicationId=amoxicillin)]) is None
+    finally:
+        monkeypatch.undo()
+        MedicalPrescriptionService(pool).seed_medications()
+
+    assert records.get_paginated_record_by_userId(patient, 10)["data"] == []
 
 
 def test_corrected_report_renames_old_region_names():

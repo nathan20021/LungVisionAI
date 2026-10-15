@@ -7,6 +7,7 @@ import {
   createPrescription,
   updatePrescription,
   deletePrescription,
+  getMedications,
 } from "../../../services/api";
 
 jest.mock("../../../services/api", () => ({
@@ -15,6 +16,7 @@ jest.mock("../../../services/api", () => ({
   createPrescription: jest.fn(),
   updatePrescription: jest.fn(),
   deletePrescription: jest.fn(),
+  getMedications: jest.fn(),
 }));
 jest.mock("../../../context/Authentication", () => ({
   useAuth: () => ({ token: "token" }),
@@ -48,7 +50,17 @@ const record = {
     ],
   },
   prescriptions: {
-    data: [{ id: "rx-1", dosage: "Amoxicillin 1 g", dosageFrequency: "3x daily", time: "", dosageDuration: "7 days" }],
+    data: [
+      {
+        id: "rx-1",
+        medicationId: "med-amox",
+        medication: "Amoxicillin",
+        dosage: "1 g",
+        dosageFrequency: "3x daily",
+        time: "",
+        dosageDuration: "7 days",
+      },
+    ],
   },
 };
 
@@ -59,7 +71,19 @@ beforeEach(() => {
   jest.clearAllMocks();
   window.localStorage.clear();
   getMedicalRecord.mockResolvedValue(record);
+  getMedications.mockResolvedValue([
+    { id: "med-amox", name: "Amoxicillin", category: "Antibiotics" },
+    { id: "med-azi", name: "Azithromycin", category: "Antibiotics" },
+    { id: "med-furo", name: "Furosemide (Lasix)", category: "Diuretics" },
+  ]);
 });
+
+// picks a medication once the list has loaded into the drop-down
+const chooseMedication = async (row, name) => {
+  const select = screen.getByLabelText(`Medication, prescription ${row}`);
+  await within(select).findByText(name);
+  fireEvent.change(select, { target: { value: within(select).getByText(name).value } });
+};
 
 test("view shows the whole record on one page, with empty fields called out", async () => {
   renderRecord();
@@ -102,7 +126,8 @@ test("editing saves the record fields and the prescription changes", async () =>
   fireEvent.change(screen.getByLabelText("Impression"), { target: { value: "Edited impression" } });
   fireEvent.click(screen.getByLabelText("Remove prescription 1"));
   fireEvent.click(screen.getByText("Add prescription"));
-  fireEvent.change(screen.getByLabelText("Dosage, prescription 1"), { target: { value: "Azithromycin 500 mg" } });
+  await chooseMedication(1, "Azithromycin");
+  fireEvent.change(screen.getByLabelText("Dosage, prescription 1"), { target: { value: "500 mg" } });
   fireEvent.click(screen.getByText("Save changes"));
 
   await waitFor(() => expect(screen.getByText("Edit record")).toBeInTheDocument());
@@ -120,7 +145,7 @@ test("editing saves the record fields and the prescription changes", async () =>
   expect(createPrescription).toHaveBeenCalledWith(
     "p1",
     record.id,
-    expect.objectContaining({ dosage: "Azithromycin 500 mg" }),
+    expect.objectContaining({ medicationId: "med-azi", dosage: "500 mg", dosageFrequency: "Once per week" }),
     "token"
   );
   expect(updatePrescription).not.toHaveBeenCalled();
@@ -138,6 +163,27 @@ test("a prescription without a dosage is not saved", async () => {
   expect(updateMedicalRecord).not.toHaveBeenCalled();
 });
 
+test("medications are grouped by category and a new prescription needs one", async () => {
+  renderRecord();
+
+  expect(await screen.findByText("Amoxicillin")).toBeInTheDocument();
+  fireEvent.click(screen.getByText("Edit record"));
+  fireEvent.click(screen.getByText("Add prescription"));
+  const select = screen.getByLabelText("Medication, prescription 2");
+  await within(select).findByText("Furosemide (Lasix)");
+  expect(
+    [...select.querySelectorAll("optgroup")].map((group) => group.label)
+  ).toEqual(["Antibiotics", "Diuretics"]);
+  expect(screen.getByLabelText("Frequency, prescription 2")).toHaveValue("Once per week");
+
+  // an untouched new row is dropped, one with a dosage but no medication is refused
+  fireEvent.change(screen.getByLabelText("Dosage, prescription 2"), { target: { value: "40 mg" } });
+  fireEvent.click(screen.getByText("Save changes"));
+
+  expect(screen.getByRole("alert")).toHaveTextContent("Choose a medication for each new prescription.");
+  expect(updateMedicalRecord).not.toHaveBeenCalled();
+});
+
 test("a failed save keeps the edits and the id of rows already created", async () => {
   updateMedicalRecord.mockResolvedValue({});
   deletePrescription.mockRejectedValue(new Error("offline"));
@@ -147,7 +193,8 @@ test("a failed save keeps the edits and the id of rows already created", async (
   fireEvent.click(await screen.findByText("Edit record"));
   fireEvent.click(screen.getByLabelText("Remove prescription 1"));
   fireEvent.click(screen.getByText("Add prescription"));
-  fireEvent.change(screen.getByLabelText("Dosage, prescription 1"), { target: { value: "Azithromycin 500 mg" } });
+  await chooseMedication(1, "Azithromycin");
+  fireEvent.change(screen.getByLabelText("Dosage, prescription 1"), { target: { value: "500 mg" } });
   fireEvent.click(screen.getByText("Save changes"));
 
   expect(await screen.findByRole("alert")).toHaveTextContent("Some changes could not be saved");

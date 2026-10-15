@@ -1,4 +1,5 @@
 from decorators.login_required import requires_doctor_or_own_patient_scope, requires_scopes
+from api.prescription import parse_prescription
 from flask import Blueprint, g, jsonify, request
 from runtime import MedicalRecordService, MedicalPrescriptionService
 from runtime import ReportGenerationService, PredictionService
@@ -6,7 +7,6 @@ from scopes import DOCTOR_RECORDS_READ, DOCTOR_RECORDS_WRITE, PATIENT_RECORDS_RE
 
 record_blueprint = Blueprint("record", __name__)
 
-PRESCRIPTION_FIELDS = ("dosage", "dosageFrequency", "dosageDuration", "time")
 
 
 @record_blueprint.route("/records", methods=["GET"])
@@ -36,9 +36,10 @@ def get_record_by_id(userId, recordId):
             jsonify({}),
             404,
         )
+    # shortcut: a record shows at most 100 prescriptions, page them if one ever needs more
     prescriptions = (
         MedicalPrescriptionService.get_paginated_prescription_by_recordId(
-            recordId, 10
+            recordId, 100
         )
     )
     record["prescriptions"] = prescriptions
@@ -77,14 +78,16 @@ def create_new_record(userId):
         "treatmentPlan": request.json.get("treatmentPlan", ""),
     }
     prescriptions = request.json.get("prescriptions", [])
-    if not isinstance(prescriptions, list) or not all(isinstance(p, dict) for p in prescriptions):
-        return jsonify({"error": "prescriptions must be a list of objects"}), 400
-    prescriptions = [
-        {field: str(p.get(field) or "") for field in PRESCRIPTION_FIELDS} for p in prescriptions
-    ]
+    if not isinstance(prescriptions, list):
+        prescriptions = [None]
+    prescriptions = [parse_prescription(p) for p in prescriptions]
+    if any(p is None for p in prescriptions):
+        return jsonify({"error": "prescriptions must be a list of objects whose fields are strings"}), 400
+    if not all(p["medicationId"] for p in prescriptions):
+        return jsonify({"error": "Each prescription needs a medication"}), 400
     newRecord = MedicalRecordService.create_new_record(userId, record_info, prescriptions)
     if not newRecord:
-        return jsonify({"error": "The record could not be created"}), 400
+        return jsonify({"error": "The record could not be created: check each prescription's medication"}), 400
     return (
         jsonify(newRecord),
         200,

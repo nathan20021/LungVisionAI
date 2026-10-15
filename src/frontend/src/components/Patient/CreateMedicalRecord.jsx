@@ -13,6 +13,7 @@ import ViewMedicalRecord, {
   PrescriptionTable,
   blankPrescription,
   completePrescriptions,
+  prescriptionError,
 } from "./ViewMedicalRecord";
 
 const ACCEPTED_FILE = /\.(jpe?g|png|gif|dcm)$/i;
@@ -349,17 +350,13 @@ function CreateMedicalRecord({ patient, onCancel, onCreated }) {
   const setDetail = (field) => (e) =>
     setDetails((current) => ({ ...current, [field]: e.target.value }));
 
-  const changePrescription = (index, field, value) =>
-    setDetails((current) => ({
-      ...current,
-      prescriptions: current.prescriptions.map((row, i) =>
-        i === index ? { ...row, [field]: value } : row
-      ),
-    }));
+  const setPrescriptions = (prescriptions) =>
+    setDetails((current) => ({ ...current, prescriptions }));
 
   const goToReview = () => {
     const rows = completePrescriptions(details.prescriptions);
-    if (!rows) return setFormError("Each prescription needs a dosage.");
+    const error = prescriptionError(rows);
+    if (error) return setFormError(error);
     setFormError("");
     setDetails((current) => ({ ...current, prescriptions: rows }));
     setStep(2);
@@ -368,9 +365,8 @@ function CreateMedicalRecord({ patient, onCancel, onCreated }) {
   const continueToReview = () => {
     if (analysis?.status === "done") return goToReview();
     // check now, not only when the results land
-    if (!completePrescriptions(details.prescriptions)) {
-      return setFormError("Each prescription needs a dosage.");
-    }
+    const error = prescriptionError(completePrescriptions(details.prescriptions));
+    if (error) return setFormError(error);
     setFormError("");
     if (analysis?.status === "error") retryAnalysis();
     setWaiting(true);
@@ -512,22 +508,13 @@ function CreateMedicalRecord({ patient, onCancel, onCreated }) {
             {details.prescriptions.length > 0 && (
               <PrescriptionTable
                 rows={details.prescriptions}
-                onChange={changePrescription}
-                onRemove={(index) =>
-                  setDetails((current) => ({
-                    ...current,
-                    prescriptions: current.prescriptions.filter((_, i) => i !== index),
-                  }))
-                }
+                onRowsChange={setPrescriptions}
               />
             )}
             <button
               type="button"
               onClick={() =>
-                setDetails((current) => ({
-                  ...current,
-                  prescriptions: [...current.prescriptions, blankPrescription()],
-                }))
+                setPrescriptions([...details.prescriptions, blankPrescription()])
               }
               className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium text-primary hover:bg-gray-50 transition"
             >
