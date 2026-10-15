@@ -9,11 +9,14 @@ export const executeHTTPRequest = async (
   path,
   headers = {},
   params = {},
-  body = {}
+  body = {},
+  // ms before giving up; 0 waits forever, which long AI calls need
+  timeout = 0
 ) => {
   const config = {
     method: httpVerb,
     url: `${API_BASE_URL}${path}`,
+    timeout,
     headers: {
       "Content-Type": "application/json",
       ...headers,
@@ -34,8 +37,12 @@ export const executeHTTPRequest = async (
   }
 };
 
+// Sign-in and sign-up fail with an error instead of hanging when the server
+// never answers (e.g. its port is not forwarded)
+const AUTH_TIMEOUT_MS = 20000;
+
 export const getAuthConfig = async () => {
-  return executeHTTPRequest("GET", "/oauth/config");
+  return executeHTTPRequest("GET", "/oauth/config", {}, {}, {}, AUTH_TIMEOUT_MS);
 };
 
 export const signUp = async (email, password, userDetails) => {
@@ -48,7 +55,8 @@ export const signUp = async (email, password, userDetails) => {
       email,
       password,
       ...userDetails,
-    }
+    },
+    AUTH_TIMEOUT_MS
   );
 };
 

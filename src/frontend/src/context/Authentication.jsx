@@ -105,7 +105,12 @@ export const AuthProvider = ({ children }) => {
       return true;
     } catch (error) {
       console.error("Registration failed:", error);
-      const data = error.response?.data;
+      if (!error.response) {
+        throw new Error(
+          "The LungVision server did not respond. Check your connection and try again."
+        );
+      }
+      const data = error.response.data;
       throw new Error(data?.message || data?.error || "Registration failed");
     }
   };
