@@ -1,6 +1,6 @@
 from decorators.login_required import authentication_required
 from flask import Blueprint, g, jsonify, request
-from runtime import IdentityProvider
+from runtime import IdentityProvider, RuntimeConfig
 
 oauth_bp = Blueprint("oauth", __name__)
 
@@ -28,6 +28,8 @@ def get_auth_config():
                         f"urn:zitadel:iam:org:project:id:{IdentityProvider.project_id}:aud",
                     ]
                 ),
+                # the SSO provider's Zitadel id, null when SSO is not configured
+                "sso_idp_id": RuntimeConfig.get("ZITADEL_SSO_IDP_ID") or None,
             }
         ),
         200,

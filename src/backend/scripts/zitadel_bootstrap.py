@@ -300,7 +300,7 @@ def ensure_sso_provider(z):
     issuer = os.getenv("SSO_OIDC_ISSUER")
     if not issuer:
         print("SSO: skipped (SSO_OIDC_ISSUER not set)")
-        return
+        return None
     name = os.getenv("SSO_OIDC_NAME", "SSO")
     provider = {
         "name": name,
@@ -344,6 +344,7 @@ def ensure_sso_provider(z):
         if err.status != 409:
             raise
     print(f"SSO: {name} ({issuer}) -> callback URL {ISSUER}/idps/callback")
+    return idp_id
 
 
 def main():
@@ -361,7 +362,7 @@ def main():
     client_id = ensure_app(z, project_id)
     service_token = ensure_service_user(z, org_id, previous.get("ZITADEL_SERVICE_USER_TOKEN"))
     ensure_login_policy(z)
-    ensure_sso_provider(z)
+    sso_idp_id = ensure_sso_provider(z)
 
     os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
     fd = os.open(CONFIG_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -372,6 +373,8 @@ def main():
                 "ZITADEL_PROJECT_ID": project_id,
                 "ZITADEL_CLIENT_ID": client_id,
                 "ZITADEL_SERVICE_USER_TOKEN": service_token,
+                # lets the frontend skip Zitadel's login page and go straight to SSO
+                "ZITADEL_SSO_IDP_ID": sso_idp_id or "",
             },
             f,
             indent=2,

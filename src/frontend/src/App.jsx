@@ -1,6 +1,5 @@
 import React from "react";
 import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
 import AuthCallbackPage from "./pages/AuthCallbackPage";
 import {
   Routes,
@@ -41,7 +40,7 @@ function App() {
         <Routes>
           <Route index element={<LoginPage />} />
           <Route path="login" element={<LoginPage />} />
-          <Route path="register" element={<RegisterPage />} />
+          <Route path="register" element={<LoginPage />} />
           <Route path="callback" element={<AuthCallbackPage />} />
           <Route
             path="settings"

@@ -1,6 +1,6 @@
 import { createContext, useState, useEffect, useContext, useCallback } from "react";
 import { signUp, getSelfUser } from "../services/api";
-import { getUserManager } from "../services/auth";
+import { getUserManager, getSsoScope } from "../services/auth";
 import { useNavigate } from "react-router-dom";
 
 export const AuthContext = createContext(null);
@@ -17,6 +17,8 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  // whether an SSO provider is configured, known once the OIDC config loads
+  const [ssoAvailable, setSsoAvailable] = useState(false);
   const navigate = useNavigate();
 
   // Load the app profile for a signed-in user. The backend grants first-time
@@ -44,6 +46,7 @@ export const AuthProvider = ({ children }) => {
     getUserManager()
       .then(async (manager) => {
         userManager = manager;
+        setSsoAvailable(!!getSsoScope());
         userManager.events.addUserLoaded(onUserLoaded);
         userManager.events.addUserUnloaded(onUserUnloaded);
 
@@ -68,10 +71,14 @@ export const AuthProvider = ({ children }) => {
     };
   }, [loadSession]);
 
-  // Sends the browser to the Zitadel login page (password or SSO)
-  const login = async (loginHint) => {
+  // Sends the browser to the Zitadel login page (password or SSO), or with
+  // sso straight to the SSO provider
+  const login = async (loginHint, { sso = false } = {}) => {
     const userManager = await getUserManager();
-    await userManager.signinRedirect(loginHint ? { login_hint: loginHint } : undefined);
+    await userManager.signinRedirect({
+      ...(loginHint && { login_hint: loginHint }),
+      ...(sso && { scope: `${userManager.settings.scope} ${getSsoScope()}` }),
+    });
   };
 
   // Called on /callback when Zitadel redirects back
@@ -124,7 +131,8 @@ export const AuthProvider = ({ children }) => {
     logout,
     isAuthenticated,
     getToken,
-    loading
+    loading,
+    ssoAvailable,
   };
 
   return (
