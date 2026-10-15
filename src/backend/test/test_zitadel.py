@@ -11,6 +11,7 @@ from runtime import IdentityProvider
 from runtime.data.zitadel import ZitadelError, ZitadelIdentityProvider
 from scopes import (
     DOCTOR_PATIENTS_READ,
+    DOCTOR_RECORDS_WRITE,
     DOCTOR_SCOPES,
     PATIENT_SCOPES,
 )
@@ -214,6 +215,7 @@ class TestZitadelHTTP(unittest.TestCase):
 @pytest.fixture
 def client():
     from api.doctor import doctor_bp
+    from api.fileHandler import s3_blueprint
     from api.oauth import oauth_bp
     from api.record import record_blueprint
     from api.user import user_blueprint
@@ -224,6 +226,7 @@ def client():
     app.register_blueprint(user_blueprint, url_prefix="/users")
     app.register_blueprint(record_blueprint, url_prefix="/users/<userId>")
     app.register_blueprint(doctor_bp, url_prefix="/doctors/<doctorId>")
+    app.register_blueprint(s3_blueprint)
     return app.test_client()
 
 
@@ -326,3 +329,20 @@ class TestScopeSeparation:
         assert body["client_id"] == IdentityProvider.client_id
         assert body["authority"] == IdentityProvider.issuer
         assert f"urn:zitadel:iam:org:id:{IdentityProvider.organization_id}" in body["scope"].split()
+        assert body["sso_idp_id"] is None
+
+    def test_auth_config_names_the_sso_provider(self, client, monkeypatch):
+        monkeypatch.setattr(IdentityProvider, "sso_idp_id", "idp-1")
+        assert client.get("/oauth/config").get_json()["sso_idp_id"] == "idp-1"
+
+
+def test_each_upload_gets_its_own_key(client):
+    runtime.S3PresignedURLHandler.generate_upload_url.side_effect = lambda key: f"https://bucket/{key}"
+    headers = auth("doc-1", [DOCTOR_RECORDS_WRITE])
+
+    first, second = (
+        client.get("/generate-upload-url/xray.jpg", headers=headers).get_json() for _ in range(2)
+    )
+
+    assert first != second
+    assert first.endswith("-xray.jpg") and second.endswith("-xray.jpg")

@@ -186,8 +186,9 @@ class Detr(pl.LightningModule):
 
         final_last_hidden_states = torch.zeros((12, 256), dtype=torch.float32)
 
-        # row i-1 holds the best query for region class i (1-12); a region the
-        # detector did not find keeps its zero row
+        # row i-1 holds the highest-scoring query labelled as region class i (1-12).
+        # There is no score threshold (get_boxes uses 0.5), so nearly every region
+        # gets a row; one that no query was labelled as keeps its zero row
         for i in range(1, 13):
             positions = np.where(labels == i)[0]
             if len(positions) == 0:

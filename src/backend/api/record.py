@@ -6,6 +6,8 @@ from scopes import DOCTOR_RECORDS_READ, DOCTOR_RECORDS_WRITE, PATIENT_RECORDS_RE
 
 record_blueprint = Blueprint("record", __name__)
 
+PRESCRIPTION_FIELDS = ("dosage", "dosageFrequency", "dosageDuration", "time")
+
 
 @record_blueprint.route("/records", methods=["GET"])
 @requires_doctor_or_own_patient_scope(DOCTOR_RECORDS_READ, PATIENT_RECORDS_READ)
@@ -74,7 +76,15 @@ def create_new_record(userId):
         "report": request.json.get("report", ""),
         "treatmentPlan": request.json.get("treatmentPlan", ""),
     }
-    newRecord = MedicalRecordService.create_new_record(userId, record_info)
+    prescriptions = request.json.get("prescriptions", [])
+    if not isinstance(prescriptions, list) or not all(isinstance(p, dict) for p in prescriptions):
+        return jsonify({"error": "prescriptions must be a list of objects"}), 400
+    prescriptions = [
+        {field: str(p.get(field) or "") for field in PRESCRIPTION_FIELDS} for p in prescriptions
+    ]
+    newRecord = MedicalRecordService.create_new_record(userId, record_info, prescriptions)
+    if not newRecord:
+        return jsonify({"error": "The record could not be created"}), 400
     return (
         jsonify(newRecord),
         200,

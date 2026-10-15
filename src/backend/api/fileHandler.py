@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from decorators.login_required import requires_scopes
 from flask import Flask, jsonify, request, Blueprint
 from runtime import S3PresignedURLHandler
@@ -12,7 +14,8 @@ def generate_upload_url(object_name):
     if not object_name:
         return jsonify({"error": "Missing object_name"}), 400
     
-    url_response = S3PresignedURLHandler.generate_upload_url(object_name)
+    # a fresh key per upload: two files with the same name must not overwrite each other
+    url_response = S3PresignedURLHandler.generate_upload_url(f"{uuid4()}-{object_name}")
 
     return jsonify(url_response)
 
